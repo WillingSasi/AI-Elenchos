@@ -12,7 +12,15 @@
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com)
 
+🔗 **在线体验 / Live Demo**: [http://101.126.35.97:6007](http://101.126.35.97:6007/)
+
 </div>
+
+### 对话示例截图 / Screenshot
+
+<p align="center">
+  <img src="docs/screenshot.jpeg" alt="AI-Elenchos 对话截图" width="800">
+</p>
 
 ---
 
@@ -329,6 +337,11 @@ AI-Elenchos/
 | **Storage** | LocalStorage (client) + JSON files (server) |
 | **i18n** | Built-in Chinese/English bilingual support |
 
+## Contact / 联系方式
+
+- **Email**: willingsasi@gmail.com
+- **GitHub**: [https://github.com/WillingSasi/AI-Elenchos](https://github.com/WillingSasi/AI-Elenchos)
+
 ## Contributing
 
 Contributions are welcome! Whether it's adding new debate strategies, improving the UI, or supporting additional model providers — feel free to open an issue or submit a pull request.
@@ -336,6 +349,22 @@ Contributions are welcome! Whether it's adding new debate strategies, improving 
 ## License
 
 [MIT License](LICENSE)
+
+---
+
+## Support / 感谢大佬们打赏
+
+如果这个项目对你有帮助，欢迎请作者喝杯咖啡 :)
+
+If this project is helpful to you, feel free to buy the author a coffee :)
+
+<p align="center">
+  <img src="docs/wx.png" alt="微信赞赏 / WeChat" width="240">&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="docs/zfb.jpeg" alt="支付宝赞赏 / Alipay" width="240">
+</p>
+<p align="center">
+  <em>微信 WeChat &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 支付宝 Alipay</em>
+</p>
 
 ---
 

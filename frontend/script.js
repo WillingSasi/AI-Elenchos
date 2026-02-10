@@ -16,6 +16,8 @@ const i18nDict = {
         saveBtn: '保存对话',
         clearBtn: '清空对话',
         scrollTopBtn: '返回顶部',
+        downloadBtn: '下载对话',
+        msgNoDownload: '没有对话内容可下载',
         testConnBtn: '测试连接',
         testingBtn: '测试中...',
         // 轮次
@@ -78,6 +80,8 @@ const i18nDict = {
         saveBtn: 'Save',
         clearBtn: 'Clear',
         scrollTopBtn: 'Top',
+        downloadBtn: 'Download',
+        msgNoDownload: 'No conversation to download',
         testConnBtn: 'Test',
         testingBtn: 'Testing...',
         roundPrefix: 'Round ',
@@ -194,6 +198,7 @@ const stopBtn = document.getElementById('stopBtn');
 const saveBtn = document.getElementById('saveBtn');
 const clearBtn = document.getElementById('clearBtn');
 const conversationHistoryEl = document.getElementById('conversationHistory');
+const pinnedQuestionEl = document.getElementById('pinnedQuestion');
 const currentRoundEl = document.getElementById('currentRound');
 const totalRoundsEl = document.getElementById('totalRounds');
 const loadingOverlay = document.getElementById('loadingOverlay');
@@ -219,6 +224,7 @@ const fabContinue = document.getElementById('fabContinue');
 const fabStop = document.getElementById('fabStop');
 const fabSave = document.getElementById('fabSave');
 const fabClear = document.getElementById('fabClear');
+const fabDownload = document.getElementById('fabDownload');
 const fabScrollTop = document.getElementById('fabScrollTop');
 
 // 初始化
@@ -272,6 +278,7 @@ function bindEventListeners() {
     fabStop.addEventListener('click', stopConversation);
     fabSave.addEventListener('click', saveConversation);
     fabClear.addEventListener('click', clearConversation);
+    fabDownload.addEventListener('click', downloadConversation);
     fabScrollTop.addEventListener('click', scrollToTop);
     
     // 监听页面滚动，控制"返回顶部"按钮的显示/隐藏
@@ -302,6 +309,7 @@ function syncFabState() {
     // save 和 clear 跟随是否有对话记录
     fabSave.disabled = conversationHistory.length === 0;
     fabClear.disabled = conversationHistory.length === 0;
+    fabDownload.disabled = conversationHistory.length === 0;
 }
 
 // 从本地存储加载配置
@@ -769,6 +777,40 @@ function clearConversation() {
     }
 }
 
+// 下载对话为 JSON 文件（纯浏览器端，不经过后端）
+function downloadConversation() {
+    if (conversationHistory.length === 0) {
+        showMessage(t('msgNoDownload'), 'warning');
+        return;
+    }
+    
+    // 兜底保存未完成的部分消息
+    finalizePartialMessage();
+    
+    const data = {
+        id: conversationId,
+        question: userQuestion.value.trim(),
+        exportTime: new Date().toISOString(),
+        totalRounds: totalRounds,
+        currentRound: currentRound,
+        modelA: modelAName.value || 'Model A',
+        modelB: modelBName.value || 'Model B',
+        history: conversationHistory
+    };
+    
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `AI-Elenchos_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 // 加载上一次的对话
 function loadLastConversation() {
     try {
@@ -853,6 +895,11 @@ function updateModelStatus(model, status) {
 // 清空对话历史显示
 function clearConversationHistory() {
     conversationHistoryEl.innerHTML = '';
+    // 隐藏置顶问题栏
+    if (pinnedQuestionEl) {
+        pinnedQuestionEl.classList.add('hidden');
+        pinnedQuestionEl.innerHTML = '';
+    }
 }
 
 // 添加消息到对话历史
@@ -864,27 +911,15 @@ function addMessage(role, content, isPartial = false) {
     const formattedContent = (content || '').replace(/\n/g, '<br>');
     
     if (role === 'user') {
-        // 用户消息使用原有布局
-        const messageWrapper = document.createElement('div');
-        messageWrapper.className = 'message-wrapper user-wrapper';
-        
-        const messageEl = document.createElement('div');
-        messageEl.className = 'message user-message';
-        
-        const timestamp = new Date().toLocaleTimeString();
-        
-        messageEl.innerHTML = `
-            <div class="message-header">
-                <span>${t('userLabel')}</span>
-                <span>${timestamp}</span>
-            </div>
-            <div class="message-content">
-                ${formattedContent}
-            </div>
-        `;
-        
-        messageWrapper.appendChild(messageEl);
-        conversationHistoryEl.appendChild(messageWrapper);
+        // 用户问题仅显示在置顶栏，不在对话流中重复
+        if (pinnedQuestionEl) {
+            pinnedQuestionEl.innerHTML = `
+                <div class="pinned-icon">💬</div>
+                <div class="pinned-text">「${formattedContent}」</div>
+            `;
+            pinnedQuestionEl.classList.remove('hidden');
+        }
+        return; // 不在对话流中插入用户消息
     } else {
         // 模型消息：CSS类名必须用小写
         const roleLower = role.toLowerCase();
@@ -947,7 +982,11 @@ function addMessage(role, content, isPartial = false) {
         }
     }
     
-    conversationHistoryEl.scrollTop = conversationHistoryEl.scrollHeight;
+    // 滚动容器是 .conversation-section（而非 conversationHistoryEl 自身）
+    const scrollContainer = conversationHistoryEl.closest('.conversation-section');
+    if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
 }
 
 // 显示加载遮罩

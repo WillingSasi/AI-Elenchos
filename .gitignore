@@ -25,3 +25,8 @@ conversations/
 # 测试文件
 test-*.js
 test-*.html
+
+# 根目录原始图片（docs/ 下有副本）
+/wx.png
+/zfb.jpeg
+/对话截图.jpeg

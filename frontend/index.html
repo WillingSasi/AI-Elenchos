@@ -69,6 +69,8 @@
 
             <!-- 中间对话区域 -->
             <section class="conversation-section">
+                <!-- 用户问题置顶栏：始终固定在对话区域顶部 -->
+                <div id="pinnedQuestion" class="pinned-question hidden"></div>
                 <div class="conversation-container">
                     <div id="conversationHistory" class="conversation-history">
                         <!-- 对话内容将在这里显示 -->
@@ -139,6 +141,10 @@
         <button id="fabClear" class="fab-btn fab-clear" title="清空对话">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
             <span class="fab-label" data-i18n="clearBtn">清空对话</span>
+        </button>
+        <button id="fabDownload" class="fab-btn fab-download" title="下载对话">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span class="fab-label" data-i18n="downloadBtn">下载对话</span>
         </button>
         <div class="fab-divider"></div>
         <button id="fabScrollTop" class="fab-btn fab-scroll-top" title="返回顶部">
