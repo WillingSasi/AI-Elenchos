@@ -1,0 +1,934 @@
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs-extra');
+const path = require('path');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ====== 日志系统 ======
+const logsDir = path.join(__dirname, '../logs');
+fs.ensureDirSync(logsDir);
+
+const logger = {
+    _getLogFile() {
+        // 按天分割日志文件
+        const date = new Date().toISOString().split('T')[0];
+        return path.join(logsDir, `server_${date}.log`);
+    },
+    _write(level, message) {
+        const timestamp = new Date().toISOString();
+        const line = `[${timestamp}] [${level}] ${message}\n`;
+        // 同时输出到控制台和文件
+        process.stdout.write(line);
+        fs.appendFileSync(this._getLogFile(), line);
+    },
+    info(msg)  { this._write('INFO', msg); },
+    warn(msg)  { this._write('WARN', msg); },
+    error(msg) { this._write('ERROR', msg); },
+    debug(msg) { this._write('DEBUG', msg); }
+};
+
+// 中间件
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+
+// 提供静态文件服务
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+// 存储活动对话
+const activeConversations = new Map();
+
+// 确保对话目录存在
+const conversationsDir = path.join(__dirname, '../conversations');
+fs.ensureDirSync(conversationsDir);
+
+// AI对话类
+class AIConversation {
+    constructor(config) {
+        this.id = uuidv4();
+        this.question = config.question;
+        this.firstSpeaker = config.firstSpeaker;
+        this.modelAConfig = config.modelAConfig;
+        this.modelBConfig = config.modelBConfig;
+        this.totalRounds = config.totalRounds || 10;
+        this.currentRound = 0;
+        this.history = [
+            { role: 'user', content: config.question }
+        ];
+        this.currentSpeaker = config.firstSpeaker;
+        this.isRunning = false;
+        this.shouldStop = false;
+        this.response = null;
+    }
+
+    async start(response) {
+        this.response = response;
+        this.isRunning = true;
+        this.shouldStop = false;
+
+        // 设置响应头以支持流式输出
+        response.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        });
+
+        try {
+            // 开始对话循环
+            await this.conversationLoop();
+        } catch (error) {
+            console.error('对话错误:', error);
+            this.sendError(error.message);
+        } finally {
+            this.sendConversationComplete();
+            this.isRunning = false;
+            response.end();
+        }
+    }
+
+    // 继续对话：基于已有history和上下文，追加更多轮次
+    async continueConversation(response, additionalRounds, existingHistory) {
+        this.response = response;
+        this.isRunning = true;
+        this.shouldStop = false;
+        this.totalRounds = this.currentRound + additionalRounds;
+        
+        // 如果前端传来了完整的对话历史，用它恢复后端状态
+        // （因为第一次对话结束后后端对象可能已被清理）
+        if (existingHistory && existingHistory.length > 0) {
+            this.history = existingHistory.map(item => ({
+                role: item.role,
+                content: item.content
+            }));
+        }
+
+        // 设置响应头
+        response.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        });
+
+        try {
+            await this.conversationLoop();
+        } catch (error) {
+            console.error('继续对话错误:', error);
+            this.sendError(error.message);
+        } finally {
+            this.sendConversationComplete();
+            this.isRunning = false;
+            response.end();
+        }
+    }
+
+    async conversationLoop() {
+        const minimumRounds = this.totalRounds;
+        
+        logger.info(`=== 对话循环开始: currentRound=${this.currentRound}, totalRounds=${minimumRounds}, speaker=${this.currentSpeaker} ===`);
+        
+        while (this.currentRound < minimumRounds && !this.shouldStop) {
+            const currentConfig = this.currentSpeaker === 'A' ? this.modelAConfig : this.modelBConfig;
+            const speakerForThisRound = this.currentSpeaker;
+            
+            logger.info(`--- 第${this.currentRound + 1}轮开始, 发言者: ${speakerForThisRound}, 模型: ${currentConfig.name} ---`);
+            
+            // 发送发言者变化事件
+            this.sendSpeakerChange(speakerForThisRound);
+            
+            // 构建对话历史
+            const messages = this.buildConversationHistory(speakerForThisRound);
+            logger.info(`[${speakerForThisRound}] 构建消息历史: ${messages.length}条`);
+            
+            // 调用AI API
+            let aiResponse;
+            try {
+                aiResponse = await this.callAI(currentConfig, messages);
+            } catch (err) {
+                logger.error(`[${speakerForThisRound}] callAI异常: ${err.message}`);
+                throw err;
+            }
+            
+            if (this.shouldStop) {
+                logger.info('对话被用户停止');
+                break;
+            }
+            
+            // 空内容保护：如果AI返回空内容，记录警告但仍继续
+            if (!aiResponse || aiResponse.trim() === '') {
+                logger.warn(`[${speakerForThisRound}] AI返回空内容！使用占位文本`);
+                aiResponse = `(模型${speakerForThisRound}未返回有效内容)`;
+            }
+            
+            logger.info(`[${speakerForThisRound}] 回复完成, 内容长度: ${aiResponse.length}, 前50字: ${aiResponse.substring(0, 50)}...`);
+            
+            // 添加到后端历史记录
+            this.history.push({
+                role: speakerForThisRound,
+                content: aiResponse
+            });
+            
+            // 发送最终完整消息
+            this.sendMessageComplete(speakerForThisRound, aiResponse);
+            
+            // 增加轮次计数
+            this.currentRound++;
+            
+            // 发送轮次完成事件
+            this.sendRoundComplete();
+            
+            // 切换发言者
+            this.currentSpeaker = speakerForThisRound === 'A' ? 'B' : 'A';
+            
+            logger.info(`--- 第${this.currentRound}轮完成, 下一个发言者: ${this.currentSpeaker} ---`);
+            
+            // 短暂延迟
+            await this.delay(1000);
+        }
+        
+        logger.info(`=== 对话循环结束: 完成${this.currentRound}轮 ===`);
+    }
+
+    /**
+     * 构建对话历史 — 会话上下文连续性的核心方法
+     * 
+     * 设计说明：
+     * OpenAI兼容API是无状态的，每次调用都需要发送完整的消息历史。
+     * 因此每个模型的"session"实际上就是累积的消息历史。
+     * 
+     * 关键机制：
+     * 1. 每个模型看到自己之前的回复作为 assistant 角色（维持自身上下文记忆）
+     * 2. 每个模型看到对方的回复作为 user 角色（作为需要回应的输入）
+     * 3. 完整的对话历史随每次API调用一起发送，保证逻辑连续性
+     * 
+     * 示例（假设A先说话）：
+     * - Round 0: A的API调用 = [system, 背景问题]
+     * - Round 1: B的API调用 = [system, 背景问题, user:"模型A的回应:..."]
+     * - Round 2: A的API调用 = [system, 背景问题, assistant:A的回复1, user:"模型B的回应:..."]
+     * - Round 3: B的API调用 = [system, 背景问题, user:"模型A的回应:...", assistant:B的回复1, user:"模型A的回应:..."]
+     * 
+     * @param {string} speaker - 当前说话者 'A' 或 'B'
+     * @returns {Array} 构建好的messages数组，可直接用于API调用
+     */
+    buildConversationHistory(speaker) {
+        const isFirstMessage = this.currentRound === 0;
+        const messages = [
+            {
+                role: 'system',
+                content: this.getSystemPrompt(speaker, isFirstMessage)
+            }
+        ];
+
+        // 添加用户的原始输入作为背景信息
+        if (this.history.length > 0 && this.history[0].role === 'user') {
+            messages.push({
+                role: 'user',
+                content: isFirstMessage ? 
+                    `用户输入的内容：${this.history[0].content}\n\n请将以上内容转化为一个标准的开放性讨论问句。` : 
+                    `讨论背景：${this.history[0].content}\n\n请基于完整的对话历史，回应对方的最新观点。`
+            });
+        }
+
+        // 构建完整的对话历史，根据当前说话者的视角分配角色
+        // 确保每个模型在自己的上下文session内保持连续性
+        this.history.forEach(item => {
+            if (item.role !== 'user') {
+                if (item.role === speaker) {
+                    // 当前说话者自己的历史发言 → assistant角色（模型的"记忆"）
+                    messages.push({
+                        role: 'assistant',
+                        content: item.content
+                    });
+                } else {
+                    // 对方的发言 → user角色（需要回应的输入）
+                    messages.push({
+                        role: 'user',
+                        content: `模型${item.role}的回应: ${item.content}`
+                    });
+                }
+            }
+        });
+
+        return messages;
+    }
+
+    getSystemPrompt(speaker, isFirstMessage = false) {
+        const otherModel = speaker === 'A' ? 'B' : 'A';
+        
+        // 所有输出共用的基础规则
+        const baseRules = `
+
+【输出规则（必须遵守）】
+- 输出内容简洁明确，清晰易懂
+- 不要长篇大论，每次回复控制在200字以内
+- 不要捏造事实，不确定的内容要明确标注
+- 直接表达核心观点，不要铺垫和客套`;
+
+        if (isFirstMessage) {
+            return `你是模型${speaker}，即将与模型${otherModel}展开一场深度讨论。
+
+你的首要任务是：将用户提供的内容（可能是一个问题、一个假设、一个论点、或一个观点）转化为一个**标准的、开放性的讨论问句**。
+
+转化要求：
+1. 无论用户给的是问句还是陈述句/论点/假设，你都需要将其重新措辞为一个适合双方深入讨论的开放性问题
+2. 保留用户原始意图的核心，但使问题更加清晰、有深度、有多角度探讨的空间
+3. 问题应该是开放性的（没有简单的是/否答案），能引发多角度、多层次的讨论
+4. 如果用户的输入已经是很好的开放性问题，可以适当润色和扩展
+
+输出格式：
+- 直接输出转化后的开放性讨论问句
+- 不需要额外的解释、前缀或引导语
+- 问句应该简洁有力，一两句话即可
+${baseRules}
+
+现在，请将用户的输入转化为标准的开放性讨论问句：`;
+        } else {
+            return `你是模型${speaker}，正在与模型${otherModel}进行深度对话讨论。
+
+你的对话应该：
+1. 仔细分析对方的观点和论据，找出其中的亮点和可商榷之处
+2. 可以提问、反驳、补充或延伸对方的观点
+3. 保持对话的连贯性和逻辑性，围绕核心讨论问题展开
+4. 用简练的语言表达深度思考，引入新的视角或论据
+
+注意：
+- 直接针对对方的上一条消息进行回应
+- 可以提出新的问题或观点，但要与讨论主题相关
+- 避免重复已讨论过的内容，推动讨论向更深层次发展
+- 保持理性和开放的态度
+${baseRules}
+
+现在，请回应对方的观点：`;
+        }
+    }
+
+    async callAI(config, messages) {
+        const { url, token, name } = config;
+        
+        // 关键：在调用开始时捕获当前speaker角色，避免使用可变的this.currentSpeaker
+        const speakerRole = this.currentSpeaker;
+        
+        try {
+            // 构建API请求
+            const apiUrl = url.endsWith('/') ? url + 'chat/completions' : url + '/chat/completions';
+            
+            // 尝试使用流式API，如果不支持则回退到普通API
+            let finalContent = '';
+            let lastSentLength = 0; // 追踪上次发送partial时的内容长度
+            
+            try {
+                // 首先尝试流式API
+                const streamResponse = await axios.post(apiUrl, {
+                    model: name,
+                    messages: messages,
+                    stream: true,
+                    temperature: 0.7,
+                    max_tokens: 2000
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000,
+                    responseType: 'stream'
+                });
+
+                // 处理流式响应
+                const stream = streamResponse.data;
+                let buffer = '';
+                
+                // 发送partial更新的辅助函数
+                const sendPartial = () => {
+                    if (this.response && !this.response.destroyed && finalContent.length > lastSentLength) {
+                        const partialData = {
+                            type: 'message_partial',
+                            role: speakerRole, // 使用捕获的角色，不用this.currentSpeaker
+                            content: finalContent,
+                            timestamp: new Date().toISOString()
+                        };
+                        this.response.write(`data: ${JSON.stringify(partialData)}\n\n`);
+                        lastSentLength = finalContent.length;
+                    }
+                };
+                
+                return new Promise((resolve, reject) => {
+                    let resolved = false;
+                    let rawChunks = []; // 记录原始数据用于调试
+                    
+                    const doResolve = () => {
+                        if (resolved) return;
+                        resolved = true;
+                        sendPartial();
+                        logger.info(`[${speakerRole}] 流式输出完成, 内容长度: ${finalContent.length}`);
+                        
+                        // 关键：如果流式返回了空内容，自动回退到非流式API重试
+                        if (finalContent.trim() === '') {
+                            logger.warn(`[${speakerRole}] 流式输出为空！记录前3个原始chunk: ${JSON.stringify(rawChunks.slice(0, 3))}`);
+                            logger.info(`[${speakerRole}] 回退到非流式API重试...`);
+                            this.callAINonStream(config, apiUrl, messages)
+                                .then(content => {
+                                    logger.info(`[${speakerRole}] 非流式API重试成功, 内容长度: ${content.length}`);
+                                    resolve(content);
+                                })
+                                .catch(err => {
+                                    logger.error(`[${speakerRole}] 非流式API重试也失败: ${err.message}`);
+                                    resolve('');
+                                });
+                        } else {
+                            resolve(finalContent);
+                        }
+                    };
+                    
+                    stream.on('data', (chunk) => {
+                        buffer += chunk.toString();
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            if (line.trim() && line.startsWith('data: ')) {
+                                const data = line.substring(6);
+                                if (data.trim() === '[DONE]') {
+                                    doResolve();
+                                    return;
+                                }
+                                
+                                try {
+                                    const parsed = JSON.parse(data);
+                                    // 记录原始数据用于调试（只记录前5个）
+                                    if (rawChunks.length < 5) {
+                                        rawChunks.push(data.substring(0, 200));
+                                    }
+                                    
+                                    if (parsed.choices && parsed.choices[0]) {
+                                        const choice = parsed.choices[0];
+                                        // 兼容多种流式响应格式
+                                        let content = null;
+                                        
+                                        // 标准格式: delta.content
+                                        if (choice.delta && choice.delta.content) {
+                                            content = choice.delta.content;
+                                        }
+                                        // 某些模型: delta.reasoning_content（思维链模型）
+                                        else if (choice.delta && choice.delta.reasoning_content) {
+                                            content = choice.delta.reasoning_content;
+                                        }
+                                        // 某些模型: message.content（非标准流式）
+                                        else if (choice.message && choice.message.content) {
+                                            content = choice.message.content;
+                                        }
+                                        // 某些模型: delta.text
+                                        else if (choice.delta && choice.delta.text) {
+                                            content = choice.delta.text;
+                                        }
+                                        // 某些模型: text（旧版completions格式）
+                                        else if (choice.text) {
+                                            content = choice.text;
+                                        }
+                                        
+                                        if (content) {
+                                            finalContent += content;
+                                            if (finalContent.length - lastSentLength >= 10 || finalContent.length < 50) {
+                                                sendPartial();
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    // 忽略解析错误
+                                }
+                            }
+                        }
+                    });
+                    
+                    stream.on('end', () => {
+                        doResolve();
+                    });
+                    
+                    stream.on('error', (error) => {
+                        if (resolved) return;
+                        resolved = true;
+                        logger.warn(`[${speakerRole}] 流式API失败，尝试普通API: ${error.message}`);
+                        this.callAINonStream(config, apiUrl, messages).then(resolve).catch(reject);
+                    });
+                });
+                
+            } catch (streamError) {
+                logger.warn(`[${speakerRole}] 流式API异常，使用普通API: ${streamError.message}`);
+                return this.callAINonStream(config, apiUrl, messages);
+            }
+        } catch (error) {
+            logger.error(`[${speakerRole}] 调用模型${config.name}失败: ${error.message}`);
+            throw new Error(`模型${config.name}调用失败: ${error.message}`);
+        }
+    }
+
+    // 非流式API调用方法
+    async callAINonStream(config, apiUrl, messages) {
+        const response = await axios.post(apiUrl, {
+            model: config.name,
+            messages: messages,
+            stream: false,
+            temperature: 0.7,
+            max_tokens: 2000
+        }, {
+            headers: {
+                'Authorization': `Bearer ${config.token}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 60000
+        });
+
+        if (response.data && response.data.choices && response.data.choices.length > 0) {
+            const choice = response.data.choices[0];
+            // 兼容多种非流式响应格式
+            const content = (choice.message && choice.message.content) ||
+                           (choice.message && choice.message.reasoning_content) ||
+                           choice.text ||
+                           '';
+            logger.info(`[非流式] 模型${config.name}返回内容长度: ${content.length}`);
+            return content;
+        } else {
+            logger.warn(`[非流式] 模型${config.name}返回格式异常: ${JSON.stringify(response.data).substring(0, 200)}`);
+            throw new Error('无效的API响应格式');
+        }
+    }
+
+    // 发送最终完整消息（一轮AI输出结束后调用）
+    // 前端收到这个事件时：更新显示为最终内容、关闭流式动画、保存到history
+    sendMessageComplete(role, content) {
+        const data = {
+            type: 'message_complete',
+            role: role,
+            content: content,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
+    sendRoundComplete() {
+        const data = {
+            type: 'round_complete',
+            round: this.currentRound,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
+    sendSpeakerChange(currentSpeaker) {
+        const previousSpeaker = currentSpeaker === 'A' ? 'B' : 'A';
+        const data = {
+            type: 'speaker_change',
+            previousSpeaker: previousSpeaker,
+            currentSpeaker: currentSpeaker,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
+    sendConversationComplete() {
+        const data = {
+            type: 'conversation_complete',
+            totalRounds: this.currentRound,
+            conversationId: this.id,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
+    sendError(message) {
+        const data = {
+            type: 'error',
+            message: message,
+            timestamp: new Date().toISOString()
+        };
+        
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
+    stop() {
+        this.shouldStop = true;
+    }
+
+    delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+}
+
+// API路由
+
+// 开始对话
+app.post('/api/start-conversation', (req, res) => {
+    const { 
+        question, 
+        firstSpeaker, 
+        modelAConfig, 
+        modelBConfig, 
+        totalRounds 
+    } = req.body;
+    
+    logger.info(`===== 新对话请求: question="${question}", firstSpeaker=${firstSpeaker}, modelA=${modelAConfig?.name}, modelB=${modelBConfig?.name}, rounds=${totalRounds} =====`);
+
+    // 验证输入
+    if (!question || !firstSpeaker || !modelAConfig || !modelBConfig) {
+        return res.status(400).json({
+            error: '缺少必要参数'
+        });
+    }
+
+    // 创建新对话
+    const conversation = new AIConversation({
+        question,
+        firstSpeaker,
+        modelAConfig,
+        modelBConfig,
+        totalRounds
+    });
+
+    // 存储对话
+    activeConversations.set(conversation.id, conversation);
+
+    // 开始对话
+    conversation.start(res);
+});
+
+// 继续对话 — 在已有对话基础上追加更多轮次
+app.post('/api/continue-conversation', (req, res) => {
+    const { 
+        question,
+        conversationId: clientConvId,
+        currentSpeaker: speaker,
+        currentRound: round,
+        additionalRounds,
+        modelAConfig, 
+        modelBConfig,
+        history
+    } = req.body;
+
+    if (!question || !modelAConfig || !modelBConfig || !history) {
+        return res.status(400).json({ error: '缺少必要参数' });
+    }
+
+    const nextSpeaker = speaker || 'A';
+    const prevRound = round || 0;
+    const addRounds = additionalRounds || 10;
+
+    // 创建一个新的AIConversation实例，但恢复之前的状态
+    const conversation = new AIConversation({
+        question,
+        firstSpeaker: nextSpeaker, // 这里设置的值会在构造函数中被赋给currentSpeaker
+        modelAConfig,
+        modelBConfig,
+        totalRounds: prevRound + addRounds // 总轮次 = 之前轮次 + 新增轮次
+    });
+
+    // 关键：覆盖构造函数中的默认值，恢复之前的状态
+    conversation.currentRound = prevRound;
+    conversation.currentSpeaker = nextSpeaker;
+
+    console.log(`继续对话: speaker=${nextSpeaker}, round=${prevRound}, totalRounds=${prevRound + addRounds}, historyLen=${history.length}`);
+
+    // 存储对话
+    activeConversations.set(conversation.id, conversation);
+
+    // 继续对话，传入已有历史
+    conversation.continueConversation(res, addRounds, history);
+});
+
+// 停止对话
+app.post('/api/stop-conversation', (req, res) => {
+    const { conversationId } = req.body;
+    logger.info(`收到停止对话请求: ${conversationId}`);
+    
+    // 尝试停止指定的对话
+    if (conversationId && activeConversations.has(conversationId)) {
+        const conversation = activeConversations.get(conversationId);
+        conversation.stop();
+        activeConversations.delete(conversationId);
+        logger.info(`对话 ${conversationId} 已停止`);
+        return res.json({ success: true });
+    }
+    
+    // 对话可能已经自然结束或ID不匹配，停止所有活动对话
+    let stoppedCount = 0;
+    activeConversations.forEach((conv, id) => {
+        conv.stop();
+        stoppedCount++;
+    });
+    if (stoppedCount > 0) {
+        activeConversations.clear();
+        logger.info(`已停止 ${stoppedCount} 个活动对话`);
+    }
+    
+    // 始终返回成功（前端不需要关心对话是否还在后端活跃）
+    return res.json({ success: true, message: `已停止 ${stoppedCount} 个对话` });
+});
+
+// 保存对话
+app.post('/api/save-conversation', async (req, res) => {
+    try {
+        const conversationData = req.body;
+        
+        // 生成文件名
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `conversation_${timestamp}.json`;
+        const filePath = path.join(conversationsDir, filename);
+        
+        // 保存对话到文件
+        await fs.writeFile(filePath, JSON.stringify(conversationData, null, 2));
+        
+        res.json({ 
+            success: true, 
+            filename: filename 
+        });
+    } catch (error) {
+        console.error('保存对话失败:', error);
+        res.status(500).json({ 
+            error: '保存对话失败',
+            message: error.message 
+        });
+    }
+});
+
+// 获取对话列表
+app.get('/api/conversations', async (req, res) => {
+    try {
+        const files = await fs.readdir(conversationsDir);
+        const conversations = [];
+        
+        for (const file of files) {
+            if (file.endsWith('.json')) {
+                const filePath = path.join(conversationsDir, file);
+                const stats = await fs.stat(filePath);
+                const content = await fs.readJson(filePath);
+                
+                conversations.push({
+                    filename: file,
+                    size: stats.size,
+                    createdAt: stats.birthtime,
+                    ...content
+                });
+            }
+        }
+        
+        // 按创建时间排序，最新的在前
+        conversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        
+        res.json(conversations);
+    } catch (error) {
+        console.error('获取对话列表失败:', error);
+        res.status(500).json({ error: '获取对话列表失败' });
+    }
+});
+
+// 获取特定对话内容
+app.get('/api/conversations/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(conversationsDir, filename);
+        
+        // 安全检查：确保文件在对话目录内
+        if (!filePath.startsWith(conversationsDir)) {
+            return res.status(403).json({ error: '禁止访问' });
+        }
+        
+        const content = await fs.readJson(filePath);
+        res.json(content);
+    } catch (error) {
+        console.error('获取对话内容失败:', error);
+        res.status(500).json({ error: '获取对话内容失败' });
+    }
+});
+
+// 删除对话
+app.delete('/api/conversations/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(conversationsDir, filename);
+        
+        // 安全检查：确保文件在对话目录内
+        if (!filePath.startsWith(conversationsDir)) {
+            return res.status(403).json({ error: '禁止访问' });
+        }
+        
+        await fs.remove(filePath);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('删除对话失败:', error);
+        res.status(500).json({ error: '删除对话失败' });
+    }
+});
+
+// 健康检查
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'OK', 
+        activeConversations: activeConversations.size,
+        timestamp: new Date().toISOString() 
+    });
+});
+
+// 测试SSE流
+app.get('/api/test-sse', (req, res) => {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type'
+    });
+    
+    // 发送测试消息
+    setTimeout(() => {
+        res.write(`data: ${JSON.stringify({type: 'test', message: 'Hello'})}\n\n`);
+    }, 1000);
+    
+    setTimeout(() => {
+        res.write(`data: ${JSON.stringify({type: 'test', message: 'World'})}\n\n`);
+    }, 2000);
+    
+    setTimeout(() => {
+        res.write(`data: ${JSON.stringify({type: 'test', message: 'Complete'})}\n\n`);
+        res.end();
+    }, 3000);
+});
+
+// 模型健康检查
+app.post('/api/check-model', async (req, res) => {
+    try {
+        const { url, token, name } = req.body;
+        
+        if (!url || !token || !name) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少必要参数: url, token, name'
+            });
+        }
+        
+        // 构建API请求
+        const apiUrl = url.endsWith('/') ? url + 'chat/completions' : url + '/chat/completions';
+        
+        const testResponse = await axios.post(apiUrl, {
+            model: name,
+            messages: [
+                { role: 'system', content: 'You are a helpful assistant.' },
+                { role: 'user', content: 'Reply with just "OK" to confirm you are working.' }
+            ],
+            stream: false,
+            temperature: 0.1,
+            max_tokens: 10
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 30000
+        });
+        
+        if (testResponse.data && testResponse.data.choices && testResponse.data.choices.length > 0) {
+            const responseText = testResponse.data.choices[0].message.content;
+            return res.json({
+                success: true,
+                response: responseText,
+                model: name,
+                usage: testResponse.data.usage || null,
+                timestamp: new Date().toISOString()
+            });
+        } else {
+            return res.status(400).json({
+                success: false,
+                error: 'API返回格式无效'
+            });
+        }
+        
+    } catch (error) {
+        let errorMessage = '模型检查失败';
+        
+        if (error.response) {
+            // 服务器返回了错误状态码
+            const statusCode = error.response.status;
+            const errorData = error.response.data;
+            
+            if (statusCode === 401) {
+                errorMessage = 'API密钥无效或已过期';
+            } else if (statusCode === 404) {
+                errorMessage = `模型 "${req.body.name}" 不存在或路径错误`;
+            } else if (statusCode === 429) {
+                errorMessage = 'API请求频率超限，请稍后再试';
+            } else if (errorData && errorData.error && errorData.error.message) {
+                errorMessage = `API错误: ${errorData.error.message}`;
+            } else {
+                errorMessage = `服务器错误 (${statusCode}): ${error.statusText}`;
+            }
+        } else if (error.request) {
+            // 请求已发出但没有收到响应
+            if (error.code === 'ECONNREFUSED') {
+                errorMessage = '无法连接到API服务器，请检查URL';
+            } else if (error.code === 'ENOTFOUND') {
+                errorMessage = '无法解析API服务器地址';
+            } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+                errorMessage = '请求超时，服务器响应太慢';
+            } else {
+                errorMessage = '网络错误: ' + error.code;
+            }
+        } else {
+            // 其他错误
+            errorMessage = error.message || '未知错误';
+        }
+        
+        return res.status(500).json({
+            success: false,
+            error: errorMessage,
+            details: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 错误处理中间件
+app.use((err, req, res, next) => {
+    console.error('服务器错误:', err);
+    res.status(500).json({ error: '服务器内部错误' });
+});
+
+// 启动服务器
+app.listen(PORT, () => {
+    logger.info(`AI-Elenchos 服务器运行在端口 ${PORT}`);
+    logger.info(`访问 http://localhost:${PORT} 打开前端页面`);
+    logger.info(`日志文件: ${logsDir}/`);
+});
+
+// 优雅关闭
+process.on('SIGTERM', () => {
+    console.log('收到SIGTERM信号，正在关闭服务器...');
+    server.close(() => {
+        console.log('服务器已关闭');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('收到SIGINT信号，正在关闭服务器...');
+    server.close(() => {
+        console.log('服务器已关闭');
+        process.exit(0);
+    });
+});

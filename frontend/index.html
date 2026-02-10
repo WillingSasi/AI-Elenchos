@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Elenchos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部标题和用户输入区域 -->
+        <header class="header">
+            <div class="header-top">
+                <h1 data-i18n="siteTitle">AI思想杂交实验室</h1>
+                <button id="langToggleBtn" class="lang-toggle-btn" title="Switch Language">
+                    <span class="lang-icon">🌐</span>
+                    <span id="langLabel">EN</span>
+                </button>
+            </div>
+            <p class="site-subtitle" data-i18n="siteSubtitle">让不同AI进行苏格拉底式的对话，以进化思想</p>
+            <div class="user-input-section">
+                <textarea id="userQuestion" data-i18n-placeholder="inputPlaceholder" placeholder="请输入要讨论的问题..." rows="2"></textarea>
+                <button id="startBtn" class="btn primary" data-i18n="startBtn">开始对话</button>
+            </div>
+        </header>
+
+        <!-- 对话控制区域 -->
+        <div class="control-section">
+            <div class="round-info">
+                <span data-i18n="roundPrefix">第 </span><span id="currentRound">0</span><span> / </span><span id="totalRounds">10</span><span data-i18n="roundSuffix"> 轮对话</span>
+            </div>
+            <div class="control-buttons">
+                <button id="continueBtn" class="btn secondary" disabled data-i18n="continueBtn">继续10轮</button>
+                <button id="stopBtn" class="btn danger" disabled data-i18n="stopBtn">停止对话</button>
+                <button id="saveBtn" class="btn secondary" data-i18n="saveBtn">保存对话</button>
+                <button id="clearBtn" class="btn secondary" data-i18n="clearBtn">清空对话</button>
+            </div>
+        </div>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <!-- 左侧模型A配置和对话 -->
+            <section class="model-section model-a">
+                <div class="model-config">
+                    <h2 data-i18n="modelATitle">模型 A</h2>
+                    <div class="config-form">
+                        <div class="form-group">
+                            <label for="modelAUrl">API URL:</label>
+                            <input type="text" id="modelAUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="modelAToken">API Token:</label>
+                            <input type="password" id="modelAToken" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="modelAName" data-i18n="modelNameLabel">模型名称:</label>
+                            <input type="text" id="modelAName" placeholder="gpt-3.5-turbo" value="gpt-3.5-turbo">
+                        </div>
+                        <div class="form-group">
+                            <button id="checkModelA" class="btn secondary check-btn" data-i18n="testConnBtn">测试连接</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="model-status">
+                    <div class="status-indicator" id="modelAStatus"></div>
+                    <span id="modelAStatusText" data-i18n="statusReady">就绪</span>
+                </div>
+            </section>
+
+            <!-- 中间对话区域 -->
+            <section class="conversation-section">
+                <div class="conversation-container">
+                    <div id="conversationHistory" class="conversation-history">
+                        <!-- 对话内容将在这里显示 -->
+                        <div class="welcome-message">
+                            <p data-i18n="welcomeTitle">欢迎使用 AI-Elenchos！</p>
+                            <p data-i18n="welcomeDesc">配置两个AI模型的API信息，输入问题后点击"开始对话"按钮，让AI们互相讨论。</p>
+                            <p><strong data-i18n="welcomeFeatureLabel">特色功能：</strong><span data-i18n="welcomeFeatureDesc">模型会基于您的问题自主提问并展开对话，无需人类干预！</span></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧模型B配置和对话 -->
+            <section class="model-section model-b">
+                <div class="model-config">
+                    <h2 data-i18n="modelBTitle">模型 B</h2>
+                    <div class="config-form">
+                        <div class="form-group">
+                            <label for="modelBUrl">API URL:</label>
+                            <input type="text" id="modelBUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+                        </div>
+                        <div class="form-group">
+                            <label for="modelBToken">API Token:</label>
+                            <input type="password" id="modelBToken" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="modelBName" data-i18n="modelNameLabel">模型名称:</label>
+                            <input type="text" id="modelBName" placeholder="gpt-4" value="gpt-4">
+                        </div>
+                        <div class="form-group">
+                            <button id="checkModelB" class="btn secondary check-btn" data-i18n="testConnBtn">测试连接</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="model-status">
+                    <div class="status-indicator" id="modelBStatus"></div>
+                    <span id="modelBStatusText" data-i18n="statusReady">就绪</span>
+                </div>
+            </section>
+        </main>
+
+        <!-- 底部信息 -->
+        <footer class="footer">
+            <p data-i18n="footer">&copy; 2024 AI-Elenchos | 让AI进行苏格拉底式的对话，以进化思想</p>
+        </footer>
+    </div>
+
+    <!-- 悬浮侧边操作栏 -->
+    <div id="floatingToolbar" class="floating-toolbar">
+        <button id="fabContinue" class="fab-btn fab-continue" title="继续10轮">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span class="fab-label" data-i18n="continueBtn">继续10轮</span>
+        </button>
+        <button id="fabStop" class="fab-btn fab-stop" title="停止对话">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            <span class="fab-label" data-i18n="stopBtn">停止对话</span>
+        </button>
+        <button id="fabSave" class="fab-btn fab-save" title="保存对话">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span class="fab-label" data-i18n="saveBtn">保存对话</span>
+        </button>
+        <button id="fabClear" class="fab-btn fab-clear" title="清空对话">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            <span class="fab-label" data-i18n="clearBtn">清空对话</span>
+        </button>
+        <div class="fab-divider"></div>
+        <button id="fabScrollTop" class="fab-btn fab-scroll-top" title="返回顶部">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/><line x1="12" y1="9" x2="12" y2="21"/><line x1="4" y1="3" x2="20" y2="3"/></svg>
+            <span class="fab-label" data-i18n="scrollTopBtn">返回顶部</span>
+        </button>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay hidden">
+        <div class="loading-spinner"></div>
+        <p data-i18n="loadingText">AI正在思考中...</p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
