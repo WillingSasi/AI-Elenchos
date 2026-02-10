@@ -179,6 +179,11 @@ let currentPartialMessage = null;
 let currentStreamingEl = null;
 let currentStreamingRole = null;
 
+// API 基地址：自动适配本地开发和远程服务器部署
+const API_BASE = window.location.origin.includes('file://') 
+    ? 'http://localhost:3000'  // 本地直接打开 HTML 文件时回退到 localhost
+    : window.location.origin;  // 部署到服务器时使用当前域名
+
 // DOM元素
 const userQuestion = document.getElementById('userQuestion');
 const startBtn = document.getElementById('startBtn');
@@ -374,7 +379,7 @@ async function startConversation() {
     try {
         console.log('开始对话，发送请求...');
         // 调用后端API开始对话
-        const response = await fetch('http://localhost:3000/api/start-conversation', {
+        const response = await fetch(`${API_BASE}/api/start-conversation`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -586,7 +591,7 @@ async function continueConversation() {
     
     try {
         console.log('继续对话，发送请求...');
-        const response = await fetch('http://localhost:3000/api/continue-conversation', {
+        const response = await fetch(`${API_BASE}/api/continue-conversation`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -680,7 +685,7 @@ function stopConversation() {
         showMessage(t('msgConvStopped'), 'info');
         
         // 调用后端API停止对话
-        fetch('http://localhost:3000/api/stop-conversation', {
+        fetch(`${API_BASE}/api/stop-conversation`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -726,7 +731,7 @@ function saveConversation() {
         localStorage.setItem('aiConversations', JSON.stringify(conversations));
         
         // 保存到文件（需要后端支持）
-        fetch('http://localhost:3000/api/save-conversation', {
+        fetch(`${API_BASE}/api/save-conversation`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1039,7 +1044,7 @@ async function checkModelHealth(model) {
     updateModelStatus(model, 'thinking');
     
     try {
-        const response = await fetch('http://localhost:3000/api/check-model', {
+        const response = await fetch(`${API_BASE}/api/check-model`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
