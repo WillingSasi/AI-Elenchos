@@ -21,9 +21,9 @@ const logger = {
     _write(level, message) {
         const timestamp = new Date().toISOString();
         const line = `[${timestamp}] [${level}] ${message}\n`;
-        // 同时输出到控制台和文件
+        // 同时输出到控制台和文件（异步写入，不阻塞事件循环）
         process.stdout.write(line);
-        fs.appendFileSync(this._getLogFile(), line);
+        fs.appendFile(this._getLogFile(), line).catch(() => {});
     },
     info(msg)  { this._write('INFO', msg); },
     warn(msg)  { this._write('WARN', msg); },
@@ -69,6 +69,15 @@ class AIConversation {
         this.isRunning = true;
         this.shouldStop = false;
 
+        // 监听客户端断开，自动停止对话循环并清理资源
+        response.on('close', () => {
+            if (this.isRunning) {
+                logger.info(`[${this.id}] 客户端断开连接，停止对话`);
+                this.shouldStop = true;
+            }
+            activeConversations.delete(this.id);
+        });
+
         // 设置响应头以支持流式输出
         response.writeHead(200, {
             'Content-Type': 'text/event-stream',
@@ -77,6 +86,9 @@ class AIConversation {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Headers': 'Content-Type'
         });
+
+        // 立即发送 conversationId，让前端知道后端实例的真实ID
+        this.sendEvent({ type: 'conversation_start', conversationId: this.id });
 
         try {
             // 开始对话循环
@@ -87,6 +99,7 @@ class AIConversation {
         } finally {
             this.sendConversationComplete();
             this.isRunning = false;
+            activeConversations.delete(this.id);
             response.end();
         }
     }
@@ -107,6 +120,15 @@ class AIConversation {
             }));
         }
 
+        // 监听客户端断开，自动停止对话循环并清理资源
+        response.on('close', () => {
+            if (this.isRunning) {
+                logger.info(`[${this.id}] 客户端断开连接，停止继续对话`);
+                this.shouldStop = true;
+            }
+            activeConversations.delete(this.id);
+        });
+
         // 设置响应头
         response.writeHead(200, {
             'Content-Type': 'text/event-stream',
@@ -116,6 +138,9 @@ class AIConversation {
             'Access-Control-Allow-Headers': 'Content-Type'
         });
 
+        // 立即发送 conversationId，让前端知道后端实例的真实ID
+        this.sendEvent({ type: 'conversation_start', conversationId: this.id });
+
         try {
             await this.conversationLoop();
         } catch (error) {
@@ -124,6 +149,7 @@ class AIConversation {
         } finally {
             this.sendConversationComplete();
             this.isRunning = false;
+            activeConversations.delete(this.id);
             response.end();
         }
     }
@@ -576,6 +602,13 @@ ${baseRules}
         }
     }
 
+    // 通用事件发送
+    sendEvent(data) {
+        if (this.response && !this.response.destroyed) {
+            this.response.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+    }
+
     sendError(message) {
         const data = {
             type: 'error',
@@ -677,12 +710,11 @@ app.post('/api/continue-conversation', (req, res) => {
     conversation.continueConversation(res, addRounds, history);
 });
 
-// 停止对话
+// 停止对话 — 仅停止指定ID的对话，不影响其他用户
 app.post('/api/stop-conversation', (req, res) => {
     const { conversationId } = req.body;
     logger.info(`收到停止对话请求: ${conversationId}`);
     
-    // 尝试停止指定的对话
     if (conversationId && activeConversations.has(conversationId)) {
         const conversation = activeConversations.get(conversationId);
         conversation.stop();
@@ -691,19 +723,9 @@ app.post('/api/stop-conversation', (req, res) => {
         return res.json({ success: true });
     }
     
-    // 对话可能已经自然结束或ID不匹配，停止所有活动对话
-    let stoppedCount = 0;
-    activeConversations.forEach((conv, id) => {
-        conv.stop();
-        stoppedCount++;
-    });
-    if (stoppedCount > 0) {
-        activeConversations.clear();
-        logger.info(`已停止 ${stoppedCount} 个活动对话`);
-    }
-    
-    // 始终返回成功（前端不需要关心对话是否还在后端活跃）
-    return res.json({ success: true, message: `已停止 ${stoppedCount} 个对话` });
+    // 找不到就直接返回成功，不影响其他用户的对话
+    logger.info(`对话 ${conversationId} 已结束或不存在，跳过`);
+    return res.json({ success: true, message: '对话已结束或不存在' });
 });
 
 // 保存对话
@@ -711,9 +733,10 @@ app.post('/api/save-conversation', async (req, res) => {
     try {
         const conversationData = req.body;
         
-        // 生成文件名
+        // 生成文件名（加入短UUID避免并发冲突）
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `conversation_${timestamp}.json`;
+        const shortId = uuidv4().slice(0, 8);
+        const filename = `conversation_${timestamp}_${shortId}.json`;
         const filePath = path.join(conversationsDir, filename);
         
         // 保存对话到文件
@@ -934,25 +957,30 @@ app.use((err, req, res, next) => {
 });
 
 // 启动服务器
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     logger.info(`AI-Elenchos 服务器运行在端口 ${PORT}`);
     logger.info(`访问 http://localhost:${PORT} 打开前端页面`);
     logger.info(`日志文件: ${logsDir}/`);
 });
 
-// 优雅关闭
-process.on('SIGTERM', () => {
-    console.log('收到SIGTERM信号，正在关闭服务器...');
+// 优雅关闭 — 停止所有活动对话并关闭服务器
+function gracefulShutdown(signal) {
+    logger.info(`收到${signal}信号，正在关闭服务器...`);
+    // 停止所有活动对话
+    activeConversations.forEach((conv, id) => {
+        conv.stop();
+    });
+    activeConversations.clear();
     server.close(() => {
-        console.log('服务器已关闭');
+        logger.info('服务器已关闭');
         process.exit(0);
     });
-});
+    // 如果10秒后还没关闭就强制退出
+    setTimeout(() => {
+        logger.warn('强制关闭服务器');
+        process.exit(1);
+    }, 10000);
+}
 
-process.on('SIGINT', () => {
-    console.log('收到SIGINT信号，正在关闭服务器...');
-    server.close(() => {
-        console.log('服务器已关闭');
-        process.exit(0);
-    });
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

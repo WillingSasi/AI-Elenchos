@@ -181,6 +181,7 @@ let isConversing = false;
 let currentSpeaker = null;
 let conversationId = null;
 let shouldStop = false;
+let currentAbortController = null; // 用于中断正在进行的 fetch 请求
 let currentPartialMessage = null;
 let currentStreamingEl = null;
 let currentStreamingRole = null;
@@ -358,9 +359,10 @@ async function startConversation() {
         return;
     }
     
-    // 重置对话状态
+    // 重置对话状态（完全回到初始值）
     conversationHistory = [];
     currentRound = 0;
+    totalRounds = 10; // 重置为默认10轮
     isConversing = true;
     currentPartialMessage = null;
     currentStreamingEl = null;
@@ -386,6 +388,9 @@ async function startConversation() {
     showLoading();
     updateModelStatus(currentSpeaker, 'thinking');
     
+    // 创建 AbortController 以便后续可以中断请求
+    currentAbortController = new AbortController();
+    
     try {
         console.log('开始对话，发送请求...');
         // 调用后端API开始对话
@@ -408,7 +413,8 @@ async function startConversation() {
                     name: modelBName.value
                 },
                 totalRounds: totalRounds
-            })
+            }),
+            signal: currentAbortController.signal
         });
         
         if (!response.ok) {
@@ -455,17 +461,26 @@ async function startConversation() {
                 }
             }
         } catch (error) {
-            console.error('流处理错误:', error);
-            showMessage(t('msgStreamError') + error.message, 'error');
+            if (error.name === 'AbortError') {
+                console.log('对话流已被用户中断');
+            } else {
+                console.error('流处理错误:', error);
+                showMessage(t('msgStreamError') + error.message, 'error');
+            }
         }
         
     } catch (error) {
-        console.error('开始对话失败:', error);
-        showMessage(t('msgStartFailed') + error.message, 'error');
-        updateModelStatus(currentSpeaker, 'error');
+        if (error.name === 'AbortError') {
+            console.log('对话请求已被用户中断');
+        } else {
+            console.error('开始对话失败:', error);
+            showMessage(t('msgStartFailed') + error.message, 'error');
+            updateModelStatus(currentSpeaker, 'error');
+        }
         isConversing = false;
         updateUI();
     } finally {
+        currentAbortController = null;
         hideLoading();
     }
 }
@@ -490,6 +505,14 @@ function finalizePartialMessage() {
 // 最终：conversation_complete
 function handleStreamData(data) {
     switch (data.type) {
+        case 'conversation_start':
+            // 后端发来真实的 conversationId，立即同步
+            if (data.conversationId) {
+                conversationId = data.conversationId;
+                console.log('同步后端 conversationId:', conversationId);
+            }
+            break;
+            
         case 'message_partial':
             // 流式输出的中间片段，逐步更新气泡内容
             if (data.role && data.content) {
@@ -553,6 +576,10 @@ function handleStreamData(data) {
             currentStreamingEl = null;
             currentStreamingRole = null;
             isConversing = false;
+            // 同步后端真正的 conversationId（continue 时后端会创建新实例）
+            if (data.conversationId) {
+                conversationId = data.conversationId;
+            }
             updateModelStatus('A', 'ready');
             updateModelStatus('B', 'ready');
             updateUI();
@@ -599,6 +626,9 @@ async function continueConversation() {
     showLoading();
     updateModelStatus(currentSpeaker, 'thinking');
     
+    // 创建 AbortController 以便后续可以中断请求
+    currentAbortController = new AbortController();
+    
     try {
         console.log('继续对话，发送请求...');
         const response = await fetch(`${API_BASE}/api/continue-conversation`, {
@@ -623,7 +653,8 @@ async function continueConversation() {
                     name: modelBName.value
                 },
                 history: conversationHistory
-            })
+            }),
+            signal: currentAbortController.signal
         });
         
         if (!response.ok) {
@@ -663,22 +694,31 @@ async function continueConversation() {
                 }
             }
         } catch (error) {
-            console.error('流处理错误:', error);
-            showMessage(t('msgContinueError') + error.message, 'error');
+            if (error.name === 'AbortError') {
+                console.log('继续对话流已被用户中断');
+            } else {
+                console.error('流处理错误:', error);
+                showMessage(t('msgContinueError') + error.message, 'error');
+            }
         }
         
     } catch (error) {
-        console.error('继续对话失败:', error);
-        showMessage(t('msgContinueFailed') + error.message, 'error');
-        updateModelStatus(currentSpeaker, 'error');
+        if (error.name === 'AbortError') {
+            console.log('继续对话请求已被用户中断');
+        } else {
+            console.error('继续对话失败:', error);
+            showMessage(t('msgContinueFailed') + error.message, 'error');
+            updateModelStatus(currentSpeaker, 'error');
+        }
         isConversing = false;
         updateUI();
     } finally {
+        currentAbortController = null;
         hideLoading();
     }
 }
 
-// 停止对话
+// 停止对话 — 立即中断前端流 + 通知后端
 function stopConversation() {
     if (isConversing) {
         // 确认是否要停止对话
@@ -689,12 +729,20 @@ function stopConversation() {
         }
         
         isConversing = false;
-        shouldStop = true; // 设置后端停止标志
+        shouldStop = true;
+        
+        // 关键：立即中断正在进行的 fetch 请求，终止 reader.read() 循环
+        if (currentAbortController) {
+            currentAbortController.abort();
+            currentAbortController = null;
+        }
+        
         updateModelStatus(currentSpeaker, 'ready');
         updateUI();
         showMessage(t('msgConvStopped'), 'info');
         
-        // 调用后端API停止对话
+        // 通知后端停止对话（后端 SSE 连接会因 abort 自动断开，
+        // 但仍发一个请求作为双重保障）
         fetch(`${API_BASE}/api/stop-conversation`, {
             method: 'POST',
             headers: {
@@ -704,7 +752,7 @@ function stopConversation() {
                 conversationId: conversationId
             })
         }).catch(error => {
-            console.error('停止对话失败:', error);
+            console.error('停止对话通知失败:', error);
         });
     }
 }
@@ -763,17 +811,38 @@ function saveConversation() {
     }
 }
 
-// 清空对话
+// 清空对话 — 完全重置到初始状态
 function clearConversation() {
-    if (conversationHistory.length > 0 && !isConversing) {
-        if (confirm(t('confirmClear'))) {
-            conversationHistory = [];
-            currentRound = 0;
-            conversationId = null;
-            clearConversationHistory();
-            updateUI();
-            showMessage(t('msgConvCleared'), 'info');
+    if (conversationHistory.length === 0 && !isConversing) return;
+    
+    if (confirm(t('confirmClear'))) {
+        // 如果正在对话中，先强制中断
+        if (isConversing) {
+            isConversing = false;
+            shouldStop = true;
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+            }
+            // 通知后端
+            fetch(`${API_BASE}/api/stop-conversation`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conversationId: conversationId })
+            }).catch(() => {});
         }
+        
+        conversationHistory = [];
+        currentRound = 0;
+        totalRounds = 10; // 重置为默认10轮
+        conversationId = null;
+        currentSpeaker = null;
+        currentPartialMessage = null;
+        currentStreamingEl = null;
+        currentStreamingRole = null;
+        clearConversationHistory();
+        updateUI();
+        showMessage(t('msgConvCleared'), 'info');
     }
 }
 
