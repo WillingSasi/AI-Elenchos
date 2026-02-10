@@ -701,6 +701,20 @@ body {
     font-size: 0.9rem;
 }
 
+.footer-github {
+    margin-top: 8px;
+}
+
+.footer-github a {
+    color: var(--text-light);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.footer-github a:hover {
+    color: var(--text-color);
+}
+
 /* 加载遮罩层 */
 .loading-overlay {
     position: fixed;

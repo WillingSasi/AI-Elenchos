@@ -5,8 +5,9 @@ const i18nDict = {
     zh: {
         // 页面结构
         siteTitle: 'AI思想杂交实验室',
-        siteSubtitle: '让不同AI进行苏格拉底式的对话，以进化思想',
+        siteSubtitle: '"未经审视的思想不值得持有。" — 改编自苏格拉底',
         footer: '© 2024 AI-Elenchos | 让AI进行苏格拉底式的对话，以进化思想',
+        footerGithub: 'GitHub 开源地址',
         // 输入 & 按钮
         inputPlaceholder: '请输入要讨论的问题...',
         startBtn: '开始对话',
@@ -67,8 +68,9 @@ const i18nDict = {
     },
     en: {
         siteTitle: 'AI Thought Hybridization Lab',
-        siteSubtitle: 'Where AI Engages in Socratic Dialogue to Evolve Ideas',
+        siteSubtitle: '"The unexamined idea is not worth holding." — Adapted from Socrates',
         footer: '© 2024 AI-Elenchos | Where AI Engages in Socratic Dialogue to Evolve Ideas',
+        footerGithub: 'Open Source on GitHub',
         inputPlaceholder: 'Enter a topic for discussion...',
         startBtn: 'Start',
         continueBtn: '+10 Rounds',
