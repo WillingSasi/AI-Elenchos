@@ -22,9 +22,26 @@
     box-sizing: border-box;
 }
 
+/* 页面背景：柔和渐变 + 缓慢动态变化（不刺眼） */
+@keyframes bgFlow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    /* 更深一档的协调渐变，动态位移，整体高级感 */
+    background: linear-gradient(
+        120deg,
+        #c8daf5 0%,
+        #dfd0ed 22%,
+        #c5e8e0 45%,
+        #eddccf 68%,
+        #d8d4ed 100%
+    );
+    background-size: 400% 400%;
+    animation: bgFlow 22s ease-in-out infinite;
     color: var(--text-color);
     line-height: 1.6;
     transition: var(--transition);
@@ -40,17 +57,17 @@ body {
     padding: 0 20px;
 }
 
-/* 头部样式 */
+/* 头部样式 — 毛玻璃 + 协调渐变 */
 .header {
     text-align: center;
     padding: 30px 0;
-    background: var(--card-bg);
-    box-shadow: var(--shadow);
+    background: linear-gradient(135deg, rgba(210, 228, 250, 0.75), rgba(228, 218, 248, 0.78));
+    box-shadow: 0 8px 32px rgba(120, 140, 200, 0.18);
     margin-bottom: 30px;
     border-radius: 15px;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(180, 198, 230, 0.55);
 }
 
 /* 标题行布局：标题居中 + 语言切换按钮右上角 */
@@ -90,15 +107,16 @@ body {
     align-items: center;
     gap: 6px;
     padding: 8px 14px;
-    border: 2px solid var(--border-color);
+    border: 1px solid rgba(170, 190, 230, 0.5);
     border-radius: 24px;
-    background: rgba(255, 255, 255, 0.85);
+    background: linear-gradient(135deg, rgba(218, 232, 250, 0.78), rgba(232, 222, 248, 0.78));
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-color);
     transition: all 0.25s ease;
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 }
 
 .lang-toggle-btn:hover {
@@ -135,12 +153,20 @@ body {
 #userQuestion {
     width: 100%;
     padding: 15px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
+    border: 1px solid rgba(170, 190, 220, 0.5);
+    border-radius: 10px;
     font-size: 1rem;
     resize: vertical;
     transition: var(--transition);
     font-family: inherit;
+    background: linear-gradient(145deg, rgba(218, 235, 252, 0.85), rgba(232, 225, 248, 0.85));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text-color);
+}
+
+#userQuestion::placeholder {
+    color: var(--text-light);
 }
 
 #userQuestion:focus {
@@ -149,19 +175,19 @@ body {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
 }
 
-/* 控制区域样式 */
+/* 控制区域样式 — 毛玻璃 + 协调渐变（含轮次显示） */
 .control-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: var(--card-bg);
     padding: 20px 30px;
     border-radius: 12px;
     margin-bottom: 25px;
-    box-shadow: var(--shadow-sm);
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 28px rgba(100, 130, 200, 0.15);
+    background: linear-gradient(135deg, rgba(210, 228, 250, 0.72), rgba(228, 218, 248, 0.72));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(170, 190, 230, 0.5);
 }
 
 .round-info {
@@ -282,18 +308,18 @@ body {
     margin-bottom: 20px;
 }
 
-/* 模型配置区域 */
+/* 模型配置区域 — 毛玻璃 + 协调渐变卡片 */
 .model-section {
-    background: var(--card-bg);
+    background: linear-gradient(145deg, rgba(208, 232, 250, 0.72), rgba(232, 222, 248, 0.7));
     border-radius: 15px;
     padding: 25px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 8px 32px rgba(100, 130, 200, 0.15);
     display: flex;
     flex-direction: column;
     transition: var(--transition);
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(170, 190, 230, 0.5);
 }
 
 .model-section:hover {
@@ -332,10 +358,13 @@ body {
 
 .form-group input {
     padding: 10px;
-    border: 2px solid var(--border-color);
-    border-radius: 5px;
+    border: 1px solid rgba(170, 190, 220, 0.5);
+    border-radius: 6px;
     font-size: 0.9rem;
     transition: var(--transition);
+    background: linear-gradient(145deg, rgba(218, 235, 252, 0.8), rgba(232, 225, 248, 0.8));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 
 .form-group input:focus {
@@ -382,15 +411,17 @@ body {
     100% { opacity: 1; }
 }
 
-/* 对话区域 — 固定高度滚动容器 */
+/* 对话区域 — 毛玻璃 + 协调渐变 */
 .conversation-section {
-    background-color: var(--card-bg);
+    background: linear-gradient(145deg, rgba(218, 238, 252, 0.7), rgba(238, 230, 252, 0.72));
     border-radius: 15px;
     padding: 20px;
-    box-shadow: var(--shadow);
+    box-shadow: 0 8px 32px rgba(100, 130, 200, 0.18);
     display: flex;
     flex-direction: column;
-    background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(170, 190, 230, 0.5);
     max-height: 85vh;
     overflow-y: auto;
 }
@@ -405,9 +436,11 @@ body {
 .conversation-history {
     flex: 1;
     padding: 20px;
-    border: 1px solid #e9ecef;
+    border: 1px solid rgba(170, 190, 220, 0.45);
     border-radius: 12px;
-    background: linear-gradient(to bottom, #fafbfc, #f1f3f4);
+    background: linear-gradient(to bottom, rgba(228, 240, 252, 0.65), rgba(235, 228, 248, 0.65));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     min-height: 400px;
 }
 
@@ -444,7 +477,7 @@ body {
 }
 
 .conversation-history::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: rgba(210, 225, 245, 0.6);
     border-radius: 4px;
 }
 
@@ -522,7 +555,7 @@ body {
     clear: both;
 }
 
-/* 用户问题置顶栏 — 毛玻璃悬浮横幅 */
+/* 用户问题置顶栏 — 毛玻璃 + 协调渐变 */
 .pinned-question {
     position: sticky;
     top: 0;
@@ -533,11 +566,11 @@ body {
     gap: 10px;
     padding: 10px 24px;
     margin: -20px -20px 16px -20px;
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(102, 126, 234, 0.15);
-    box-shadow: 0 2px 12px rgba(102, 126, 234, 0.08);
+    background: linear-gradient(90deg, rgba(210, 228, 250, 0.72), rgba(228, 218, 248, 0.72));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(160, 180, 220, 0.45);
+    box-shadow: 0 4px 20px rgba(100, 120, 180, 0.12);
     flex-shrink: 0;
 }
 
