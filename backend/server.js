@@ -251,6 +251,34 @@ class AIConversation {
             }
         ];
 
+        // 根据双方当前人格，动态决定称呼（不再写死为苏格拉底/亚里士多德）
+        const personaDisplayNames = {
+            socrates: '苏格拉底',
+            musk: '马斯克',
+            critic: '杠精',
+            philosopher: '哲学家',
+            ma_yun: '马云',
+            trump: '川普',
+            xi: '秩序型领导',
+            xi_jinping: '习近平',
+            jiang_zemin: '江泽民',
+            ikkyu: '一休和尚',
+            zhuangzi: '庄子',
+            nietzsche: '尼采',
+            lu_xun: '鲁迅',
+            munger: '芒格',
+            joker: '小丑段子手',
+            standup: '脱口秀选手'
+        };
+
+        const getDisplayNameForRole = (role) => {
+            const isA = role === 'A';
+            const baseName = isA ? '苏格拉底' : '亚里士多德';
+            const cfg = isA ? this.modelAConfig : this.modelBConfig;
+            const code = cfg && cfg.persona;
+            return (code && personaDisplayNames[code]) || baseName;
+        };
+
         // 添加用户的原始输入作为背景信息
         if (this.history.length > 0 && this.history[0].role === 'user') {
             messages.push({
@@ -273,8 +301,7 @@ class AIConversation {
                     });
                 } else {
                     // 对方的发言 → user角色（需要回应的输入）
-                    const personaNames = { A: '苏格拉底', B: '亚里士多德' };
-                    const otherName = personaNames[item.role] || item.role;
+                    const otherName = getDisplayNameForRole(item.role);
                     messages.push({
                         role: 'user',
                         content: `${otherName}的回应: ${item.content}`
@@ -287,12 +314,73 @@ class AIConversation {
     }
 
     getSystemPrompt(speaker, isFirstMessage = false) {
-        // 拟人化称呼：A→"苏格拉底"（质疑者），B→"亚里士多德"（建构者）
-        const personas = {
+        // 拟人化称呼：默认 A→"苏格拉底"（质疑者），B→"亚里士多德"（建构者）
+        const basePersonas = {
             A: { name: '苏格拉底', otherName: '亚里士多德', role: '质疑者与解构者' },
             B: { name: '亚里士多德', otherName: '苏格拉底', role: '建构者与捍卫者' }
         };
-        const me = personas[speaker];
+
+        // 人格设定：由前端传入，可为空，同时用于动态覆盖称呼
+        const personaStyles = {
+            default: '',
+            socrates: '你的说话风格更接近苏格拉底：喜欢用连环追问和反讽逼对方暴露前提，但不要故意装傻。',
+            musk: '你的说话风格更接近马斯克：大胆设想、技术细节丰富，敢于给出现实中难以实现的激进方案。',
+            critic: '你的说话风格像一个专业「杠精」：专门找论点的漏洞、前后矛盾和隐藏假设，但不要进行人身攻击。',
+            philosopher: '你的说话风格像一位哲学家：善用抽象概念、比喻和反思，把讨论提升到更高层次。',
+            ma_yun: '你的说话风格像马云：喜欢讲故事、打比方、顺便输出一点鸡汤，语气接地气又略带鼓动性。',
+            trump: '你的说话风格像川普：直白、极端、爱下判断和抛金句，但要避免真实政治立场与人身攻击。',
+            xi: '你的说话风格像一位重视秩序与大局观的领导者：语气稳重、强调长期与整体利益，避免真实政治内容。',
+            xi_jinping: '你的说话风格像习近平,偏向“大局观+稳健务实”：注重长期规划、整体安全与秩序，用较正式的语言阐述立场，避免涉及现实具体政治事件。',
+            jiang_zemin: '你的说话风格像江泽民,偏向“正式中带一点幽默”：语言有条理、有一点书面感，偶尔穿插风趣表达来化解紧张气氛，同样避免现实政治话题。',
+            ikkyu: '你的说话风格像一休和尚：看似顽皮，实际用出人意料的比喻说深刻道理，略带禅意和幽默。',
+            zhuangzi: '你的说话风格像庄子：爱用夸张寓言和天马行空的比喻，从常识外的角度质疑一切理所当然。',
+            nietzsche: '你的说话风格像尼采：锋利、激进、充满对价值与权力的反思，不怕用极端表述刺破伪善。',
+            lu_xun: '你的说话风格像鲁迅：冷峻、讽刺，擅长一针见血地指出逻辑与人性的荒诞。',
+            munger: '你的说话风格像查理·芒格：极度理性、重视多元思维模型，善于用简单例子说明复杂道理。',
+            joker: '你的说话风格像喜欢玩梗的搞笑up主：一本正经讲道理时顺手抛几个沙雕梗，但不影响结论清晰。',
+            standup: '你的说话风格像脱口秀演员：用段子、反转和自嘲推进论证，在笑点中传递犀利观点。'
+        };
+
+        const personaDisplayNames = {
+            socrates: '苏格拉底',
+            musk: '马斯克',
+            critic: '杠精',
+            philosopher: '哲学家',
+            ma_yun: '马云',
+            trump: '川普',
+            xi: '秩序型领导',
+            xi_jinping: '习近平',
+            jiang_zemin: '江泽民',
+            ikkyu: '一休和尚',
+            zhuangzi: '庄子',
+            nietzsche: '尼采',
+            lu_xun: '鲁迅',
+            munger: '芒格',
+            joker: '小丑段子手',
+            standup: '脱口秀选手'
+        };
+
+        const myPersonaCode = speaker === 'A'
+            ? (this.modelAConfig && this.modelAConfig.persona) || 'default'
+            : (this.modelBConfig && this.modelBConfig.persona) || 'default';
+
+        const otherPersonaCode = speaker === 'A'
+            ? (this.modelBConfig && this.modelBConfig.persona) || 'default'
+            : (this.modelAConfig && this.modelAConfig.persona) || 'default';
+
+        const baseMe = basePersonas[speaker];
+        const baseOther = speaker === 'A' ? basePersonas.B : basePersonas.A;
+
+        const meDisplayName = (myPersonaCode && personaDisplayNames[myPersonaCode]) || baseMe.name;
+        const otherDisplayName = (otherPersonaCode && personaDisplayNames[otherPersonaCode]) || baseOther.name;
+
+        const me = {
+            name: meDisplayName,
+            otherName: otherDisplayName,
+            role: baseMe.role
+        };
+
+        const personaDesc = personaStyles[myPersonaCode] || '';
         const question = this.question || '';
         
         // 所有输出共用的基础规则
@@ -303,6 +391,7 @@ class AIConversation {
 - 不要捏造事实，不确定的内容明确标注
 - 禁止空洞的客套和赞美，直奔核心
 - 每次回复必须包含：①对对方论点的明确立场 ②你的独立论据 ③一个追问或挑战
+- 适度使用 emoji（如🤔😏⚔️🔥）来表达语气和立场，但不要过度堆砌，必须保证文字本身清晰易读
 - 本次讨论的核心议题是：「${question}」——所有回复必须紧扣此主题，偏离时立即拉回`;
 
         if (isFirstMessage) {
@@ -346,6 +435,8 @@ ${baseRules}
 你们是两位独立的思考者，以第一人称"我"称呼自己，以"你"称呼对方。像真人对话一样自然交流。
 
 ${rolePrompt}
+
+${personaDesc ? `【人格设定】\n- ${personaDesc}\n` : ''}
 
 禁止行为：
 - 不要说"你说得很好"、"我同意你的观点"等顺从性表述
@@ -946,6 +1037,101 @@ app.post('/api/check-model', async (req, res) => {
             error: errorMessage,
             details: error.message,
             timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// 裁判模型 C：对当前对话进行评判
+app.post('/api/judge', async (req, res) => {
+    try {
+        const { question, history, judgeConfig, round, auto } = req.body;
+
+        if (!question || !history || !Array.isArray(history)) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少必要参数: question 或 history'
+            });
+        }
+
+        if (!judgeConfig || !judgeConfig.url || !judgeConfig.token || !judgeConfig.name) {
+            return res.status(400).json({
+                success: false,
+                error: '缺少裁判模型配置: url / token / name'
+            });
+        }
+
+        const { url, token, name } = judgeConfig;
+
+        // 构建简要对话梗概（避免 token 过长，这里按最近 20 条对话截断）
+        const recent = history.slice(-20);
+        const lines = recent.map((msg, idx) => {
+            let speaker;
+            if (msg.role === 'A') speaker = '模型 A';
+            else if (msg.role === 'B') speaker = '模型 B';
+            else if (msg.role === 'user') speaker = '用户/上帝视角';
+            else speaker = msg.role;
+            return `[#${idx + 1}] ${speaker}: ${msg.content}`;
+        });
+        const summaryText = lines.join('\n\n');
+
+        const apiUrl = url.endsWith('/') ? url + 'chat/completions' : url + '/chat/completions';
+
+        const messages = [
+            {
+                role: 'system',
+                content: `你是裁判模型 C，一位冷静、公正、略带幽默感的哲学评审。
+你需要在阅读「模型 A」与「模型 B」的一段对话后，给出一份「回合判决」：
+- 指出本阶段中哪一方在论证、逻辑严密性、攻击有效性上更占上风（可以判「势均力敌」）
+- 指出每一方最有力的论点各一条
+- 指出双方目前各自最大的漏洞或盲点各一条
+- 给出下一阶段双方可以如何升级自己论点的建议
+输出风格可以适度使用 emoji（例如 ⚖️🔥🤺😏），增加阅读趣味，但必须保证信息清晰、结构分明。`
+            },
+            {
+                role: 'user',
+                content: `讨论的核心议题是：「${question}」
+
+下面是最近一段对话摘要（最多 20 条，从旧到新）：
+${summaryText}
+
+请基于上述内容做出本阶段的裁判判决。`
+            }
+        ];
+
+        const response = await axios.post(apiUrl, {
+            model: name,
+            messages,
+            stream: false,
+            temperature: 0.6,
+            max_tokens: 800
+        }, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 45000
+        });
+
+        let content = '';
+        if (response.data && response.data.choices && response.data.choices.length > 0) {
+            const choice = response.data.choices[0];
+            content = (choice.message && choice.message.content) ||
+                      choice.text ||
+                      '';
+        }
+
+        return res.json({
+            success: true,
+            content,
+            model: name,
+            round: round || null,
+            auto: !!auto
+        });
+    } catch (error) {
+        logger.error(`裁判模型调用失败: ${error.message}`);
+        return res.status(500).json({
+            success: false,
+            error: '裁判模型调用失败: ' + (error.message || '未知错误')
         });
     }
 });
