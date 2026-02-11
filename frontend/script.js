@@ -18,6 +18,10 @@ const i18nDict = {
         scrollTopBtn: '返回顶部',
         downloadBtn: '下载对话',
         msgNoDownload: '没有对话内容可下载',
+        judgeBtn: '立即裁判当前对话',
+        msgJudgeConfig: '请先完整配置裁判模型C的 URL / Token / 名称',
+        msgJudgeRunning: '裁判 C 正在评判本阶段对话…',
+        msgJudgeFailed: '裁判 C 评判失败: ',
         testConnBtn: '测试连接',
         testingBtn: '测试中...',
         // 轮次
@@ -35,10 +39,10 @@ const i18nDict = {
         // 加载
         loadingText: 'AI正在思考中...',
         // 欢迎
-        welcomeTitle: '欢迎使用 AI-Elenchos！',
-        welcomeDesc: '配置两个AI模型的API信息，输入问题后点击"开始对话"按钮，让AI们互相讨论。',
+        welcomeTitle: '欢迎来到 AI 逻辑角斗场！',
+        welcomeDesc: '为 AI 赋予人格，看它们如何在这场逻辑风暴中相互较量。',
         welcomeFeatureLabel: '特色功能：',
-        welcomeFeatureDesc: '模型会基于您的问题自主提问并展开对话，无需人类干预！',
+        welcomeFeatureDesc: '你可以作为“幕后推手”，随时通过【神之干预】扭转战局！',
         // 消息 & 提示
         msgInputRequired: '请输入要讨论的问题',
         msgConvComplete: '对话已完成！',
@@ -67,6 +71,14 @@ const i18nDict = {
         modelFallbackB: '模型 B',
         waitingReply: '(等待回复...)',
         noValidContent: '(模型{0}未返回有效内容)',
+        // 人格 / 裁判 / 神之干预
+        personaLabel: '人格设定:',
+        interventionPlaceholder: '神之干预：向双方抛出一个致命论点或指令...',
+        interventionSendBtn: '投放',
+        judgeTitle: '裁判 C',
+        judgeUrlLabel: '裁判 API URL:',
+        judgeTokenLabel: '裁判 API Token:',
+        judgeNameLabel: '裁判模型名称:',
     },
     en: {
         siteTitle: 'AI Thought Hybridization Lab',
@@ -82,6 +94,10 @@ const i18nDict = {
         scrollTopBtn: 'Top',
         downloadBtn: 'Download',
         msgNoDownload: 'No conversation to download',
+        judgeBtn: 'Ask Judge C',
+        msgJudgeConfig: 'Please configure Judge C (URL / Token / Model name) first',
+        msgJudgeRunning: 'Judge C is evaluating this round…',
+        msgJudgeFailed: 'Judge C failed: ',
         testConnBtn: 'Test',
         testingBtn: 'Testing...',
         roundPrefix: 'Round ',
@@ -94,10 +110,10 @@ const i18nDict = {
         statusError: 'Error',
         statusUnknown: 'Unknown',
         loadingText: 'AI is thinking...',
-        welcomeTitle: 'Welcome to AI-Elenchos!',
-        welcomeDesc: 'Configure two AI models, enter a topic, and click "Start" to let them debate.',
+        welcomeTitle: 'Welcome to the AI Colosseum!',
+        welcomeDesc: 'Assign personas to AI models and watch them clash in a storm of arguments.',
         welcomeFeatureLabel: 'Key Feature: ',
-        welcomeFeatureDesc: 'Models autonomously pose questions and explore ideas — no human intervention needed!',
+        welcomeFeatureDesc: 'You can act as the hidden director and disrupt the battle at any time via "God Intervention".',
         msgInputRequired: 'Please enter a topic for discussion',
         msgConvComplete: 'Conversation complete!',
         msgConvStopped: 'Conversation stopped',
@@ -124,8 +140,101 @@ const i18nDict = {
         modelFallbackB: 'Model B',
         waitingReply: '(Awaiting response...)',
         noValidContent: '(Model {0} returned no content)',
+        // Persona / Judge / Intervention labels
+        personaLabel: 'Persona:',
+        interventionPlaceholder: 'God Intervention: throw a killer argument or instruction to both sides...',
+        interventionSendBtn: 'Cast',
+        judgeTitle: 'Judge C',
+        judgeUrlLabel: 'Judge API URL:',
+        judgeTokenLabel: 'Judge API Token:',
+        judgeNameLabel: 'Judge Model Name:',
     }
 };
+
+// 人格下拉选项多语言名称映射（根据 value 决定显示文本）
+const personaLabelMap = {
+    default: {
+        zh: '默认 (理性分析)',
+        en: 'Default (rational analyst)'
+    },
+    socrates: {
+        zh: '苏格拉底 (不断追问)',
+        en: 'Socrates (relentless questioning)'
+    },
+    musk: {
+        zh: '马斯克 (技术激进)',
+        en: 'Elon Musk (tech radical)'
+    },
+    critic: {
+        zh: '杠精 (为了反对而反对)',
+        en: 'Contrarian (professional critic)'
+    },
+    philosopher: {
+        zh: '智者 (深奥玄学)',
+        en: 'Philosopher (abstract & reflective)'
+    },
+    ma_yun: {
+        zh: '马云 (商业故事+鸡汤)',
+        en: 'Jack Ma (business stories & slogans)'
+    },
+    trump: {
+        zh: '川普 (金句输出)',
+        en: 'Trump (punchy soundbites)'
+    },
+    xi_jinping: {
+        zh: '习近平 (大局观务实)',
+        en: 'Xi (macro-order & stability tone)'
+    },
+    jiang_zemin: {
+        zh: '江泽民 (幽默而正式)',
+        en: 'Jiang (formal with a touch of humor)'
+    },
+    ikkyu: {
+        zh: '一休和尚 (禅意冷幽默)',
+        en: 'Ikkyū (Zen-flavored dry humor)'
+    },
+    zhuangzi: {
+        zh: '庄子 (逍遥游与反常识)',
+        en: 'Zhuangzi (wild parables & anti-common-sense)'
+    },
+    nietzsche: {
+        zh: '尼采 (价值重估)',
+        en: 'Nietzsche (value revaluation)'
+    },
+    lu_xun: {
+        zh: '鲁迅 (冷峻讽刺)',
+        en: 'Lu Xun (cold satire)'
+    },
+    munger: {
+        zh: '芒格 (多元思维模型)',
+        en: 'Munger (mental models)'
+    },
+    joker: {
+        zh: '搞笑up主 (玩梗吐槽)',
+        en: 'Meme Joker (jokes & roasts)'
+    },
+    standup: {
+        zh: '脱口秀选手 (段子与反转)',
+        en: 'Stand-up comic (bits & punchlines)'
+    }
+};
+
+// 根据当前语言刷新人格下拉框里的文本
+function updatePersonaSelectLabels() {
+    const selects = [
+        document.getElementById('modelAPersona'),
+        document.getElementById('modelBPersona')
+    ].filter(Boolean);
+
+    selects.forEach(select => {
+        Array.from(select.options).forEach(opt => {
+            const code = opt.value;
+            if (personaLabelMap[code]) {
+                opt.textContent = personaLabelMap[code][currentLang] || personaLabelMap[code].zh;
+            }
+        });
+    });
+}
 
 // i18n 工具函数
 function t(key, ...args) {
@@ -162,6 +271,8 @@ function applyI18n() {
     document.title = 'AI-Elenchos | ' + t('siteTitle');
     // 更新 html lang
     document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+    // 更新人格下拉框文本
+    updatePersonaSelectLabels();
 }
 
 // 切换语言
@@ -186,6 +297,12 @@ let currentPartialMessage = null;
 let currentStreamingEl = null;
 let currentStreamingRole = null;
 
+// 气势分数（0-100）
+let momentumScoreA = 50;
+let momentumScoreB = 50;
+let momentumSamples = []; // 最近若干轮的气势采样，用于更平滑的对决感
+let autoScrollEnabled = true; // 是否自动跟随最新内容滚动
+
 // API 基地址：自动适配本地开发和远程服务器部署
 const API_BASE = window.location.origin.includes('file://') 
     ? 'http://localhost:3000'  // 本地直接打开 HTML 文件时回退到 localhost
@@ -204,10 +321,21 @@ const currentRoundEl = document.getElementById('currentRound');
 const totalRoundsEl = document.getElementById('totalRounds');
 const loadingOverlay = document.getElementById('loadingOverlay');
 
+// 气势条与神之干预 & 裁判
+const momentumAEl = document.getElementById('momentumA');
+const momentumBEl = document.getElementById('momentumB');
+const momentumAPercentEl = document.getElementById('momentumAPercent');
+const momentumBPercentEl = document.getElementById('momentumBPercent');
+const interventionSection = document.getElementById('interventionSection');
+const interventionInput = document.getElementById('interventionInput');
+const interventionBtn = document.getElementById('interventionBtn');
+const judgeResultsEl = document.getElementById('judgeResults');
+
 // 模型A的DOM元素
 const modelAUrl = document.getElementById('modelAUrl');
 const modelAToken = document.getElementById('modelAToken');
 const modelAName = document.getElementById('modelAName');
+const modelAPersona = document.getElementById('modelAPersona');
 const modelAStatus = document.getElementById('modelAStatus');
 const modelAStatusText = document.getElementById('modelAStatusText');
 const checkModelA = document.getElementById('checkModelA');
@@ -216,9 +344,16 @@ const checkModelA = document.getElementById('checkModelA');
 const modelBUrl = document.getElementById('modelBUrl');
 const modelBToken = document.getElementById('modelBToken');
 const modelBName = document.getElementById('modelBName');
+const modelBPersona = document.getElementById('modelBPersona');
 const modelBStatus = document.getElementById('modelBStatus');
 const modelBStatusText = document.getElementById('modelBStatusText');
 const checkModelB = document.getElementById('checkModelB');
+
+// 裁判模型C DOM
+const judgeUrl = document.getElementById('judgeUrl');
+const judgeToken = document.getElementById('judgeToken');
+const judgeName = document.getElementById('judgeName');
+const judgeBtn = document.getElementById('judgeBtn');
 
 // 悬浮侧边栏DOM元素
 const fabContinue = document.getElementById('fabContinue');
@@ -240,6 +375,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 绑定事件监听器
     bindEventListeners();
     
+    // 初始化气势条
+    resetMomentum();
+    
     // 初始化UI
     updateUI();
     
@@ -259,8 +397,20 @@ function bindEventListeners() {
     checkModelA.addEventListener('click', () => checkModelHealth('A'));
     checkModelB.addEventListener('click', () => checkModelHealth('B'));
     
-    // 输入框变化时保存到本地存储
-    [modelAUrl, modelAToken, modelAName, modelBUrl, modelBToken, modelBName].forEach(input => {
+    // 输入框变化时保存到本地存储（包含裁判模型配置）
+    [
+        modelAUrl,
+        modelAToken,
+        modelAName,
+        modelBUrl,
+        modelBToken,
+        modelBName,
+        judgeUrl,
+        judgeToken,
+        judgeName
+    ]
+    .filter(Boolean)
+    .forEach(input => {
         input.addEventListener('change', saveConfigToStorage);
     });
     
@@ -282,11 +432,96 @@ function bindEventListeners() {
     fabDownload.addEventListener('click', downloadConversation);
     fabScrollTop.addEventListener('click', scrollToTop);
     
+    // 神之干预
+    if (interventionBtn && interventionInput) {
+        interventionBtn.addEventListener('click', sendIntervention);
+        interventionInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendIntervention();
+            }
+        });
+    }
+
+    // 裁判按钮
+    if (judgeBtn) {
+        judgeBtn.addEventListener('click', () => {
+            callJudge(false);
+        });
+    }
+    
     // 监听页面滚动，控制"返回顶部"按钮的显示/隐藏
     window.addEventListener('scroll', onWindowScroll);
+    // 监听对话区域滚动，用于智能自动滚动
+    if (conversationHistoryEl) {
+        conversationHistoryEl.addEventListener('scroll', onConversationScroll);
+    }
     
     // 语言切换按钮
     document.getElementById('langToggleBtn').addEventListener('click', toggleLanguage);
+}
+
+// 重置气势条
+function resetMomentum() {
+    momentumScoreA = 50;
+    momentumScoreB = 50;
+    momentumSamples = [];
+    if (momentumAEl && momentumBEl) {
+        momentumAEl.style.width = '50%';
+        momentumBEl.style.width = '50%';
+        const bar = momentumAEl.parentElement;
+        if (bar) {
+            bar.classList.remove('explosive', 'explosive-active');
+        }
+    }
+    if (momentumAPercentEl && momentumBPercentEl) {
+        momentumAPercentEl.textContent = '50%';
+        momentumBPercentEl.textContent = '50%';
+    }
+}
+
+// 根据最近若干条完整发言更新气势条，更贴近双方整体火力
+function updateMomentum(role, contentLength) {
+    if (!momentumAEl || !momentumBEl) return;
+
+    const len = Math.max(1, contentLength || 1);
+    momentumSamples.push({ role, len });
+    if (momentumSamples.length > 12) {
+        momentumSamples.shift();
+    }
+
+    let sumA = 0;
+    let sumB = 0;
+    momentumSamples.forEach(s => {
+        if (s.role === 'A') sumA += s.len;
+        if (s.role === 'B') sumB += s.len;
+    });
+    const total = sumA + sumB || 1;
+    const ratioA = sumA / total;
+
+    // 让胜势一方在 30%～70% 区间内波动，而不是一边倒死锁
+    const targetA = 20 + 60 * ratioA;
+
+    // 做一点缓动，避免条形条突兀跳动
+    const alpha = 0.35;
+    momentumScoreA = momentumScoreA * (1 - alpha) + targetA * alpha;
+    momentumScoreB = 100 - momentumScoreA;
+
+    momentumAEl.style.width = `${momentumScoreA}%`;
+    momentumBEl.style.width = `${momentumScoreB}%`;
+
+    if (momentumAPercentEl && momentumBPercentEl) {
+        const aRound = Math.round(momentumScoreA);
+        const bRound = 100 - aRound;
+        momentumAPercentEl.textContent = `${aRound}%`;
+        momentumBPercentEl.textContent = `${bRound}%`;
+    }
+
+    const bar = momentumAEl.parentElement;
+    if (bar) {
+        bar.classList.add('explosive');
+        bar.classList.toggle('explosive-active', momentumScoreA > 70 || momentumScoreA < 30);
+    }
 }
 
 // 页面滚动事件：显示/隐藏返回顶部按钮
@@ -296,6 +531,14 @@ function onWindowScroll() {
     } else {
         fabScrollTop.classList.remove('visible');
     }
+}
+
+// 对话区域滚动事件：仅当用户视图停留在底部附近时才保持自动滚动
+function onConversationScroll() {
+    if (!conversationHistoryEl) return;
+    const { scrollTop, scrollHeight, clientHeight } = conversationHistoryEl;
+    const threshold = 40; // 离底部 40px 以内都认为是“在看最新”
+    autoScrollEnabled = scrollTop + clientHeight >= scrollHeight - threshold;
 }
 
 // 平滑滚动到页面顶部
@@ -325,6 +568,10 @@ function loadConfigFromStorage() {
         if (config.modelBUrl) modelBUrl.value = config.modelBUrl;
         if (config.modelBToken) modelBToken.value = config.modelBToken;
         if (config.modelBName) modelBName.value = config.modelBName;
+
+        if (config.judgeUrl && judgeUrl) judgeUrl.value = config.judgeUrl;
+        if (config.judgeToken && judgeToken) judgeToken.value = config.judgeToken;
+        if (config.judgeName && judgeName) judgeName.value = config.judgeName;
     } catch (error) {
         console.error('加载配置失败:', error);
     }
@@ -339,7 +586,10 @@ function saveConfigToStorage() {
             modelAName: modelAName.value,
             modelBUrl: modelBUrl.value,
             modelBToken: modelBToken.value,
-            modelBName: modelBName.value
+            modelBName: modelBName.value,
+            judgeUrl: judgeUrl ? judgeUrl.value : '',
+            judgeToken: judgeToken ? judgeToken.value : '',
+            judgeName: judgeName ? judgeName.value : ''
         };
         localStorage.setItem('aiDialogueConfig', JSON.stringify(config));
     } catch (error) {
@@ -368,6 +618,11 @@ async function startConversation() {
     currentStreamingEl = null;
     currentStreamingRole = null;
     conversationId = generateConversationId();
+    autoScrollEnabled = true;
+    resetMomentum();
+    if (judgeResultsEl) {
+        judgeResultsEl.innerHTML = '';
+    }
     
     // 随机选择第一个发言者
     currentSpeaker = Math.random() < 0.5 ? 'A' : 'B';
@@ -405,12 +660,14 @@ async function startConversation() {
                 modelAConfig: {
                     url: modelAUrl.value,
                     token: modelAToken.value,
-                    name: modelAName.value
+                    name: modelAName.value,
+                    persona: modelAPersona ? modelAPersona.value : 'default'
                 },
                 modelBConfig: {
                     url: modelBUrl.value,
                     token: modelBToken.value,
-                    name: modelBName.value
+                    name: modelBName.value,
+                    persona: modelBPersona ? modelBPersona.value : 'default'
                 },
                 totalRounds: totalRounds
             }),
@@ -545,6 +802,8 @@ function handleStreamData(data) {
                     content: finalContent,
                     timestamp: new Date().toISOString()
                 });
+                // 根据完整内容更新一次气势
+                updateMomentum(data.role, finalContent.length);
                 
                 // 清除partial追踪（已有完整版本）
                 currentPartialMessage = null;
@@ -557,6 +816,10 @@ function handleStreamData(data) {
         case 'round_complete':
             currentRound = data.round;
             updateUI();
+            // 每 10 轮结束后自动触发一次裁判（如果已配置裁判模型）
+            if (currentRound > 0 && currentRound % 10 === 0) {
+                callJudge(true);
+            }
             break;
             
         case 'speaker_change':
@@ -597,6 +860,93 @@ function handleStreamData(data) {
             hideLoading();
             break;
     }
+}
+
+// 调用裁判模型C
+async function callJudge(isAuto = false) {
+    if (!judgeUrl || !judgeToken || !judgeName) return;
+
+    const url = judgeUrl.value.trim();
+    const token = judgeToken.value.trim();
+    const name = judgeName.value.trim();
+
+    // 自动裁判时，如果未配置就静默跳过
+    if (!url || !token || !name) {
+        if (!isAuto) {
+            showMessage(t('msgJudgeConfig'), 'warning');
+        }
+        return;
+    }
+
+    if (conversationHistory.length === 0) {
+        return;
+    }
+
+    try {
+        if (judgeBtn) {
+            judgeBtn.disabled = true;
+        }
+        showMessage(t('msgJudgeRunning'), 'info');
+
+        const res = await fetch(`${API_BASE}/api/judge`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                question: userQuestion.value.trim(),
+                history: conversationHistory,
+                judgeConfig: {
+                    url,
+                    token,
+                    name
+                },
+                round: currentRound,
+                auto: isAuto
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.error || 'Unknown error');
+        }
+
+        appendJudgeResult(data.content, data.round || currentRound, isAuto, data.model || name);
+    } catch (error) {
+        console.error('裁判失败:', error);
+        showMessage(t('msgJudgeFailed') + error.message, 'error');
+    } finally {
+        if (judgeBtn) {
+            judgeBtn.disabled = false;
+            judgeBtn.textContent = t('judgeBtn');
+        }
+    }
+}
+
+// 在页面上追加一条裁判结果
+function appendJudgeResult(content, round, isAuto, modelName) {
+    if (!judgeResultsEl) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'judge-result';
+
+    const title = isAuto
+        ? `第 ${round} 轮结束 · 裁判C（${modelName}）判决`
+        : `手动触发 · 裁判C（${modelName}）判决`;
+
+    const timeStr = new Date().toLocaleTimeString();
+
+    wrapper.innerHTML = `
+        <div class="judge-result-header">
+            <span>${title}</span>
+            <span>${timeStr}</span>
+        </div>
+        <div class="judge-result-body">
+            ${ (content || '').replace(/\n/g, '<br>') }
+        </div>
+    `;
+
+    judgeResultsEl.appendChild(wrapper);
 }
 
 // 继续对话 — 基于已有对话历史继续追加10轮
@@ -645,12 +995,14 @@ async function continueConversation() {
                 modelAConfig: {
                     url: modelAUrl.value,
                     token: modelAToken.value,
-                    name: modelAName.value
+                    name: modelAName.value,
+                    persona: modelAPersona ? modelAPersona.value : 'default'
                 },
                 modelBConfig: {
                     url: modelBUrl.value,
                     token: modelBToken.value,
-                    name: modelBName.value
+                    name: modelBName.value,
+                    persona: modelBPersona ? modelBPersona.value : 'default'
                 },
                 history: conversationHistory
             }),
@@ -776,10 +1128,12 @@ function saveConversation() {
             currentRound: currentRound,
             history: conversationHistory,
             modelAConfig: {
-                name: modelAName.value
+                name: modelAName.value,
+                persona: modelAPersona ? modelAPersona.value : 'default'
             },
             modelBConfig: {
-                name: modelBName.value
+                name: modelBName.value,
+                persona: modelBPersona ? modelBPersona.value : 'default'
             }
         };
         
@@ -840,6 +1194,11 @@ function clearConversation() {
         currentPartialMessage = null;
         currentStreamingEl = null;
         currentStreamingRole = null;
+        autoScrollEnabled = true;
+        resetMomentum();
+        if (judgeResultsEl) {
+            judgeResultsEl.innerHTML = '';
+        }
         clearConversationHistory();
         updateUI();
         showMessage(t('msgConvCleared'), 'info');
@@ -971,6 +1330,33 @@ function clearConversationHistory() {
     }
 }
 
+// 取得当前展示用的人格名称
+function getPersonaDisplayName(role) {
+    const select = role === 'A' ? modelAPersona : modelBPersona;
+    if (!select) return null;
+    const code = select.value;
+    if (!code || code === 'default') return null;
+    const mapping = {
+        socrates: '苏格拉底',
+        musk: '马斯克',
+        critic: '杠精',
+        philosopher: '哲学家',
+        ma_yun: '马云',
+        trump: '川普',
+        xi: '秩序型领导',
+        xi_jinping: '习近平',
+        jiang_zemin: '江泽民',
+        ikkyu: '一休和尚',
+        zhuangzi: '庄子',
+        nietzsche: '尼采',
+        lu_xun: '鲁迅',
+        munger: '芒格',
+        joker: '小丑段子手',
+        standup: '脱口秀选手'
+    };
+    return mapping[code] || null;
+}
+
 // 添加消息到对话历史
 // 核心改进：使用显式变量跟踪当前流式输出的DOM元素，
 // 不再通过搜索DOM匹配最后一个同角色wrapper（该方式在消息丢失时会导致覆盖）
@@ -1022,7 +1408,12 @@ function addMessage(role, content, isPartial = false) {
             
             const timestamp = new Date().toLocaleTimeString();
             
-            const modelDisplayName = role === 'A' ? (modelAName.value || t('modelFallbackA')) : (modelBName.value || t('modelFallbackB'));
+            const personaName = getPersonaDisplayName(role);
+            const modelDisplayName = personaName
+                ? personaName
+                : (role === 'A'
+                    ? (modelAName.value || t('modelFallbackA'))
+                    : (modelBName.value || t('modelFallbackB')));
             messageEl.innerHTML = `
                 <div class="message-header">
                     <span>${t('modelLabel', role, modelDisplayName)}</span>
@@ -1051,10 +1442,9 @@ function addMessage(role, content, isPartial = false) {
         }
     }
     
-    // 滚动容器是 .conversation-section（而非 conversationHistoryEl 自身）
-    const scrollContainer = conversationHistoryEl.closest('.conversation-section');
-    if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    // 仅在用户视图处于底部时自动滚动，避免手动翻阅时被打断
+    if (autoScrollEnabled && conversationHistoryEl) {
+        conversationHistoryEl.scrollTop = conversationHistoryEl.scrollHeight;
     }
 }
 
@@ -1188,6 +1578,22 @@ async function checkModelHealth(model) {
         checkBtn.disabled = false;
         checkBtn.textContent = t('testConnBtn');
     }
+}
+
+// 神之干预：仅在前端插入一条“上帝视角”用户消息，影响后续轮次的上下文
+function sendIntervention() {
+    if (!interventionInput || !conversationId || isConversing) return;
+    const content = interventionInput.value.trim();
+    if (!content) return;
+    
+    const text = `【神之干预】${content}`;
+    addMessage('user', text);
+    conversationHistory.push({
+        role: 'user',
+        content: text,
+        timestamp: new Date().toISOString()
+    });
+    interventionInput.value = '';
 }
 
 // 生成对话ID

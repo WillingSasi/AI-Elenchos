@@ -57,6 +57,27 @@
                             <input type="text" id="modelAName" placeholder="gpt-3.5-turbo" value="gpt-3.5-turbo">
                         </div>
                         <div class="form-group">
+                            <label for="modelAPersona" data-i18n="personaLabel">人格设定:</label>
+                            <select id="modelAPersona" class="persona-select">
+                                <option value="default">默认 (理性分析)</option>
+                                <option value="socrates">苏格拉底 (不断追问)</option>
+                                <option value="musk">马斯克 (技术激进)</option>
+                                <option value="critic">杠精 (为了反对而反对)</option>
+                                <option value="philosopher">智者 (深奥玄学)</option>
+                                <option value="ma_yun">马云 (商业故事+鸡汤)</option>
+                                <option value="trump">川普 (金句输出)</option>
+                                <option value="xi_jinping">习近平 (大局观务实)</option>
+                                <option value="jiang_zemin">江泽民 (幽默而正式)</option>
+                                <option value="ikkyu">一休和尚 (禅意冷幽默)</option>
+                                <option value="zhuangzi">庄子 (逍遥游与反常识)</option>
+                                <option value="nietzsche">尼采 (价值重估)</option>
+                                <option value="lu_xun">鲁迅 (冷峻讽刺)</option>
+                                <option value="munger">芒格 (多元思维模型)</option>
+                                <option value="joker">搞笑up主 (玩梗吐槽)</option>
+                                <option value="standup">脱口秀选手 (段子与反转)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <button id="checkModelA" class="btn secondary check-btn" data-i18n="testConnBtn">测试连接</button>
                         </div>
                     </div>
@@ -69,16 +90,52 @@
 
             <!-- 中间对话区域 -->
             <section class="conversation-section">
+                <!-- 角斗场气势条 -->
+                <div class="colosseum-momentum">
+                    <div class="momentum-label model-a">
+                        模型 A 气势
+                        <span id="momentumAPercent" class="momentum-percent">50%</span>
+                    </div>
+                    <div class="momentum-bar-container">
+                        <div id="momentumA" class="momentum-fill model-a" style="width: 50%;"></div>
+                        <div id="momentumFlame" class="momentum-flame">🔥</div>
+                        <div id="momentumB" class="momentum-fill model-b" style="width: 50%;"></div>
+                    </div>
+                    <div class="momentum-label model-b">
+                        模型 B 气势
+                        <span id="momentumBPercent" class="momentum-percent">50%</span>
+                    </div>
+                </div>
+
                 <!-- 用户问题置顶栏：始终固定在对话区域顶部 -->
                 <div id="pinnedQuestion" class="pinned-question hidden"></div>
                 <div class="conversation-container">
                     <div id="conversationHistory" class="conversation-history">
                         <!-- 对话内容将在这里显示 -->
                         <div class="welcome-message">
-                            <p data-i18n="welcomeTitle">欢迎使用 AI-Elenchos！</p>
-                            <p data-i18n="welcomeDesc">配置两个AI模型的API信息，输入问题后点击"开始对话"按钮，让AI们互相讨论。</p>
-                            <p><strong data-i18n="welcomeFeatureLabel">特色功能：</strong><span data-i18n="welcomeFeatureDesc">模型会基于您的问题自主提问并展开对话，无需人类干预！</span></p>
+                            <p data-i18n="welcomeTitle">欢迎来到 AI 逻辑角斗场！</p>
+                            <p data-i18n="welcomeDesc">为 AI 赋予人格，看它们如何在这场逻辑风暴中相互较量。</p>
+                            <p>
+                                <strong data-i18n="welcomeFeatureLabel">特色功能：</strong>
+                                <span data-i18n="welcomeFeatureDesc">你可以作为“幕后推手”，随时通过【神之干预】扭转战局！</span>
+                            </p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 裁判结果展示区 -->
+                <div id="judgeResults" class="judge-results"></div>
+
+                <!-- 神之干预输入框 -->
+                <div id="interventionSection" class="intervention-section hidden">
+                    <div class="intervention-input-wrapper">
+                        <input
+                            type="text"
+                            id="interventionInput"
+                            placeholder="神之干预：向双方抛出一个致命论点或指令..."
+                            data-i18n-placeholder="interventionPlaceholder"
+                        />
+                        <button id="interventionBtn" class="btn primary" data-i18n="interventionSendBtn">投放</button>
                     </div>
                 </div>
             </section>
@@ -101,6 +158,27 @@
                             <input type="text" id="modelBName" placeholder="gpt-4" value="gpt-4">
                         </div>
                         <div class="form-group">
+                            <label for="modelBPersona" data-i18n="personaLabel">人格设定:</label>
+                            <select id="modelBPersona" class="persona-select">
+                                <option value="default">默认 (理性分析)</option>
+                                <option value="socrates">苏格拉底 (不断追问)</option>
+                                <option value="musk">马斯克 (技术激进)</option>
+                                <option value="critic">杠精 (为了反对而反对)</option>
+                                <option value="philosopher">智者 (深奥玄学)</option>
+                                <option value="ma_yun">马云 (商业故事+鸡汤)</option>
+                                <option value="trump">川普 (金句输出)</option>
+                                <option value="xi_jinping">习近平 (大局观务实)</option>
+                                <option value="jiang_zemin">江泽民 (幽默而正式)</option>
+                                <option value="ikkyu">一休和尚 (禅意冷幽默)</option>
+                                <option value="zhuangzi">庄子 (逍遥游与反常识)</option>
+                                <option value="nietzsche">尼采 (价值重估)</option>
+                                <option value="lu_xun">鲁迅 (冷峻讽刺)</option>
+                                <option value="munger">芒格 (多元思维模型)</option>
+                                <option value="joker">搞笑up主 (玩梗吐槽)</option>
+                                <option value="standup">脱口秀选手 (段子与反转)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <button id="checkModelB" class="btn secondary check-btn" data-i18n="testConnBtn">测试连接</button>
                         </div>
                     </div>
@@ -110,11 +188,35 @@
                     <span id="modelBStatusText" data-i18n="statusReady">就绪</span>
                 </div>
             </section>
+
+            <!-- 裁判模型 C 配置 -->
+            <section class="model-section model-c">
+                <div class="model-config">
+                    <h2 data-i18n="judgeTitle">裁判 C</h2>
+                    <div class="config-form">
+                        <div class="form-group">
+                            <label for="judgeUrl" data-i18n="judgeUrlLabel">裁判 API URL:</label>
+                            <input type="text" id="judgeUrl" placeholder="(可选) 不填则不自动裁判">
+                        </div>
+                        <div class="form-group">
+                            <label for="judgeToken" data-i18n="judgeTokenLabel">裁判 API Token:</label>
+                            <input type="password" id="judgeToken" placeholder="sk-...">
+                        </div>
+                        <div class="form-group">
+                            <label for="judgeName" data-i18n="judgeNameLabel">裁判模型名称:</label>
+                            <input type="text" id="judgeName" placeholder="gpt-4, gpt-4.1-mini 等">
+                        </div>
+                        <div class="form-group">
+                            <button id="judgeBtn" class="btn secondary" data-i18n="judgeBtn">立即裁判当前对话</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <!-- 底部信息 -->
         <footer class="footer">
-            <p data-i18n="footer">&copy; 2024 AI-Elenchos | 让AI进行苏格拉底式的对话，以进化思想</p>
+            <p data-i18n="footer">&copy; 2026 AI-Elenchos | 让AI进行苏格拉底式的对话，以进化思想</p>
             <p class="footer-github">
                 <a href="https://github.com/WillingSasi/AI-Elenchos" target="_blank" rel="noopener noreferrer">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align: text-bottom; margin-right: 4px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>

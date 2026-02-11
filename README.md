@@ -42,13 +42,17 @@
 ## 功能特色
 
 - **多模型辩论** — 让任意两个大语言模型就任何话题展开对抗
+- **人格预设系统** — 为模型 A/B 选择不同人格（如苏格拉底、马云、川普、鲁迅、脱口秀选手等），并在对话和提示词中自动使用对应称呼与文风
 - **流式实时输出** — 通过 SSE 技术实时观看对话展开过程
 - **苏格拉底首轮** — 首个模型会将你的输入重新组织为严谨的开放性讨论问题
 - **上下文连续性** — 每个模型在整个对话过程中维持独立的上下文会话
-- **无限延展轮次** — 默认10轮，可一键无限追加
-- **悬浮操作栏** — 滚动到页面任意位置都能快速操作
+- **无限延展轮次** — 默认 10 轮，可一键无限追加
+- **悬浮操作栏** — 滚动到页面任意位置都能快速操作（继续 10 轮 / 停止 / 保存 / 清空 / 返回顶部 / 下载对话）
 - **中英双语界面** — 一键切换中文/英文界面
-- **保存与回放** — 导出完整对话为 JSON 文件供后续分析
+- **对话下载与保存** — 导出完整对话为 JSON 文件，或保存到服务器 `conversations/` 目录
+- **气势条（Momentum Bar）** — 可视化展示当前哪一方更“占上风”，带百分比、爆炸效果与火焰图标
+- **神之干预** — 用户可在对话中途插入“上帝视角”提示，影响后续辩论走向
+- **裁判模型 C** — 可选配置第三个模型作为裁判，对每 10 轮（或手动触发）的对话做出判决，并在页面中记录结果
 
 ## 快速开始
 
@@ -184,13 +188,17 @@ Unlike simple Q&A, AI-Elenchos orchestrates **multi-turn, adversarial dialogues*
 ## Features
 
 - **Multi-Model Debate** — Pit any two LLMs against each other on any topic
+- **Persona System for A/B** — Assign different personas to each model (e.g. Socrates, Elon Musk, business storyteller, sarcastic critic, stand-up comedian) and let prompts and UI reflect those personas dynamically
 - **Streaming Output** — Watch the dialogue unfold in real-time with Server-Sent Events
 - **Socratic First Turn** — The opening model reformulates your input into a rigorous, open-ended discussion question
 - **Contextual Continuity** — Each model maintains its own conversation context across all rounds
 - **Extendable Rounds** — Start with 10 rounds, then continue indefinitely with one click
-- **Floating Toolbar** — Quick-access controls that follow you as you scroll
+- **Floating Toolbar** — Quick-access controls that follow you as you scroll (continue +10, stop, save, clear, scroll-to-top, download)
 - **Bilingual UI** — One-click Chinese/English interface toggle
-- **Save & Replay** — Export full conversations as JSON for later analysis
+- **Save & Replay** — Export full conversations as JSON for later analysis or persist them on the server
+- **Momentum Bar** — A visual "arena" bar with percentages and flame effects, showing which side currently dominates the debate
+- **God Intervention** — Inject “divine interventions” into the conversation to steer or disrupt the debate mid-way
+- **Judge Model C** — An optional third model that periodically (or on demand) evaluates the latest rounds and outputs structured verdicts in a dedicated panel
 
 ## Quick Start
 
