@@ -19,7 +19,7 @@
 ### 对话示例截图 / Screenshot
 
 <p align="center">
-  <img src="docs/screenshot.jpeg" alt="AI-Elenchos 对话截图" width="800">
+  <img src="docs/screenshot.png" alt="AI-Elenchos 对话截图" width="800">
 </p>
 
 ---
