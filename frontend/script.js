@@ -303,6 +303,9 @@ let momentumScoreB = 50;
 let momentumSamples = []; // 最近若干轮的气势采样，用于更平滑的对决感
 let autoScrollEnabled = true; // 是否自动跟随最新内容滚动
 
+// 单条回复最大字数（与后端提示词统一，前端展示/存储按此截断）
+const MAX_REPLY_LENGTH = 350;
+
 // API 基地址：自动适配本地开发和远程服务器部署
 const API_BASE = window.location.origin.includes('file://') 
     ? 'http://localhost:3000'  // 本地直接打开 HTML 文件时回退到 localhost
@@ -326,6 +329,7 @@ const momentumAEl = document.getElementById('momentumA');
 const momentumBEl = document.getElementById('momentumB');
 const momentumAPercentEl = document.getElementById('momentumAPercent');
 const momentumBPercentEl = document.getElementById('momentumBPercent');
+const momentumFlameEl = document.getElementById('momentumFlame');
 const interventionSection = document.getElementById('interventionSection');
 const interventionInput = document.getElementById('interventionInput');
 const interventionBtn = document.getElementById('interventionBtn');
@@ -478,6 +482,9 @@ function resetMomentum() {
         momentumAPercentEl.textContent = '50%';
         momentumBPercentEl.textContent = '50%';
     }
+    if (momentumFlameEl) {
+        momentumFlameEl.style.left = '50%';
+    }
 }
 
 // 根据最近若干条完整发言更新气势条，更贴近双方整体火力
@@ -521,6 +528,9 @@ function updateMomentum(role, contentLength) {
     if (bar) {
         bar.classList.add('explosive');
         bar.classList.toggle('explosive-active', momentumScoreA > 70 || momentumScoreA < 30);
+    }
+    if (momentumFlameEl) {
+        momentumFlameEl.style.left = `${momentumScoreA}%`;
     }
 }
 
@@ -771,14 +781,17 @@ function handleStreamData(data) {
             break;
             
         case 'message_partial':
-            // 流式输出的中间片段，逐步更新气泡内容
+            // 流式输出的中间片段，逐步更新气泡内容（按统一字数截断）
             if (data.role && data.content) {
-                addMessage(data.role, data.content, true);
+                const partialContent = data.content.length > MAX_REPLY_LENGTH
+                    ? data.content.slice(0, MAX_REPLY_LENGTH)
+                    : data.content;
+                addMessage(data.role, partialContent, true);
                 
                 // 持续追踪当前部分消息的最新内容（用于兜底保存）
                 currentPartialMessage = {
                     role: data.role,
-                    content: data.content,
+                    content: partialContent,
                     timestamp: new Date().toISOString()
                 };
                 
@@ -790,9 +803,12 @@ function handleStreamData(data) {
             break;
             
         case 'message_complete':
-            // 一轮AI输出的最终完整内容
+            // 一轮AI输出的最终完整内容（按统一字数截断）
             if (data.role) {
-                const finalContent = data.content || t('noValidContent', data.role);
+                let finalContent = data.content || t('noValidContent', data.role);
+                if (finalContent.length > MAX_REPLY_LENGTH) {
+                    finalContent = finalContent.slice(0, MAX_REPLY_LENGTH);
+                }
                 // 用最终内容更新气泡（isPartial=false会关闭打字动画）
                 addMessage(data.role, finalContent, false);
                 
