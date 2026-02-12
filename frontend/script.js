@@ -11,6 +11,7 @@ const i18nDict = {
         // 输入 & 按钮
         inputPlaceholder: '请输入要讨论的问题...',
         startBtn: '开始对话',
+        start50Btn: '开始50轮',
         continueBtn: '继续10轮',
         stopBtn: '停止对话',
         saveBtn: '保存对话',
@@ -87,6 +88,7 @@ const i18nDict = {
         footerGithub: 'Open Source on GitHub',
         inputPlaceholder: 'Enter a topic for discussion...',
         startBtn: 'Start',
+        start50Btn: 'Start 50 Rounds',
         continueBtn: '+10 Rounds',
         stopBtn: 'Stop',
         saveBtn: 'Save',
@@ -314,6 +316,7 @@ const API_BASE = window.location.origin.includes('file://')
 // DOM元素
 const userQuestion = document.getElementById('userQuestion');
 const startBtn = document.getElementById('startBtn');
+const start50Btn = document.getElementById('start50Btn');
 const continueBtn = document.getElementById('continueBtn');
 const stopBtn = document.getElementById('stopBtn');
 const saveBtn = document.getElementById('saveBtn');
@@ -391,7 +394,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 绑定事件监听器
 function bindEventListeners() {
-    startBtn.addEventListener('click', startConversation);
+    startBtn.addEventListener('click', () => startConversation(10));
+    if (start50Btn) start50Btn.addEventListener('click', () => startConversation(50));
     continueBtn.addEventListener('click', continueConversation);
     stopBtn.addEventListener('click', stopConversation);
     saveBtn.addEventListener('click', saveConversation);
@@ -607,8 +611,8 @@ function saveConfigToStorage() {
     }
 }
 
-// 开始对话
-async function startConversation() {
+// 开始对话，rounds 不传则默认 10 轮
+async function startConversation(rounds = 10) {
     const question = userQuestion.value.trim();
     if (!question) {
         showMessage(t('msgInputRequired'), 'warning');
@@ -622,7 +626,7 @@ async function startConversation() {
     // 重置对话状态（完全回到初始值）
     conversationHistory = [];
     currentRound = 0;
-    totalRounds = 10; // 重置为默认10轮
+    totalRounds = rounds;
     isConversing = true;
     currentPartialMessage = null;
     currentStreamingEl = null;
@@ -832,10 +836,6 @@ function handleStreamData(data) {
         case 'round_complete':
             currentRound = data.round;
             updateUI();
-            // 每 10 轮结束后自动触发一次裁判（如果已配置裁判模型）
-            if (currentRound > 0 && currentRound % 10 === 0) {
-                callJudge(true);
-            }
             break;
             
         case 'speaker_change':
@@ -863,6 +863,8 @@ function handleStreamData(data) {
             updateModelStatus('B', 'ready');
             updateUI();
             showMessage(t('msgConvComplete'), 'success');
+            // 整场对话结束后再自动裁判一次（不打断进行中的对话）
+            callJudge(true);
             break;
             
         case 'error':
@@ -1290,6 +1292,7 @@ function updateUI() {
     totalRoundsEl.textContent = totalRounds;
     
     startBtn.disabled = isConversing;
+    if (start50Btn) start50Btn.disabled = isConversing;
     continueBtn.disabled = isConversing || conversationHistory.length === 0;
     
     // 允许随时停止对话，但给出提示

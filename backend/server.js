@@ -884,10 +884,11 @@ app.get('/api/conversations', async (req, res) => {
 app.get('/api/conversations/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
-        const filePath = path.join(conversationsDir, filename);
+        const baseDir = path.resolve(conversationsDir);
+        const filePath = path.resolve(baseDir, filename);
         
-        // 安全检查：确保文件在对话目录内
-        if (!filePath.startsWith(conversationsDir)) {
+        // 安全检查：解析后必须在对话目录内，防止 path traversal
+        if (filePath !== baseDir && !filePath.startsWith(baseDir + path.sep)) {
             return res.status(403).json({ error: '禁止访问' });
         }
         
@@ -903,10 +904,11 @@ app.get('/api/conversations/:filename', async (req, res) => {
 app.delete('/api/conversations/:filename', async (req, res) => {
     try {
         const filename = req.params.filename;
-        const filePath = path.join(conversationsDir, filename);
+        const baseDir = path.resolve(conversationsDir);
+        const filePath = path.resolve(baseDir, filename);
         
-        // 安全检查：确保文件在对话目录内
-        if (!filePath.startsWith(conversationsDir)) {
+        // 安全检查：解析后必须在对话目录内，防止 path traversal
+        if (filePath !== baseDir && !filePath.startsWith(baseDir + path.sep)) {
             return res.status(403).json({ error: '禁止访问' });
         }
         
