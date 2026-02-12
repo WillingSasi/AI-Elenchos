@@ -8,6 +8,9 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 单条回复最大字数（与前端截断统一）
+const MAX_REPLY_LENGTH = 350;
+
 // ====== 日志系统 ======
 const logsDir = path.join(__dirname, '../logs');
 fs.ensureDirSync(logsDir);
@@ -387,7 +390,7 @@ class AIConversation {
         const baseRules = `
 
 【输出规则（必须遵守）】
-- 每次回复控制在300字以内，简洁有力
+- 每次回复控制在${MAX_REPLY_LENGTH}字以内，简洁有力
 - 不要捏造事实，不确定的内容明确标注
 - 禁止空洞的客套和赞美，直奔核心
 - 每次回复必须包含：①对对方论点的明确立场 ②你的独立论据 ③一个追问或挑战

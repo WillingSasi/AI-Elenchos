@@ -490,8 +490,8 @@ body {
     background: radial-gradient(circle at top left, rgba(233, 243, 255, 0.98), rgba(240, 232, 255, 0.98));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    min-height: 420px;
-    max-height: 75vh;
+    min-height: 630px;
+    max-height: 112.5vh;
     overflow-y: auto;
 }
 
@@ -655,18 +655,32 @@ body {
     opacity: 1;
 }
 
-/* 气势对撞火苗图标 */
+/* 气势对撞火苗图标：位置由 JS 设为 A/B 交界，带闪烁动画，置于最上层 */
 .momentum-flame {
     position: absolute;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
+    z-index: 10;
     font-size: 1rem;
     pointer-events: none;
     text-shadow:
         0 0 8px rgba(255, 193, 7, 0.9),
         0 0 16px rgba(255, 87, 34, 0.9);
     filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
+    transition: left 0.5s cubic-bezier(0.34, 1.2, 0.64, 1);
+    animation: flameFlicker 0.7s ease-in-out infinite;
+}
+
+@keyframes flameFlicker {
+    0%, 100% {
+        opacity: 1;
+        filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)) brightness(1);
+    }
+    50% {
+        opacity: 0.88;
+        filter: drop-shadow(0 0 12px rgba(255, 193, 7, 0.95)) brightness(1.12);
+    }
 }
 
 /* 神之干预区域 */
