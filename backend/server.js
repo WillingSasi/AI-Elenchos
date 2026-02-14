@@ -1120,9 +1120,15 @@ ${summaryText}
         let content = '';
         if (response.data && response.data.choices && response.data.choices.length > 0) {
             const choice = response.data.choices[0];
-            content = (choice.message && choice.message.content) ||
-                      choice.text ||
-                      '';
+            const raw = (choice.message && choice.message.content) ?? choice.text ?? '';
+            // 兼容 content 为数组的情况（如多模态 API 返回 [{ type: 'text', text: '...' }]）
+            if (typeof raw === 'string') {
+                content = raw;
+            } else if (Array.isArray(raw)) {
+                content = raw.map(p => (typeof p === 'string' ? p : (p && p.text) || '')).join('');
+            } else if (raw && typeof raw === 'object') {
+                content = raw.text || raw.content || '';
+            }
         }
 
         return res.json({
