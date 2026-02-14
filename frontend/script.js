@@ -954,13 +954,22 @@ function appendJudgeResult(content, round, isAuto, modelName) {
 
     const timeStr = new Date().toLocaleTimeString();
 
+    // 兼容 content 为数组（部分 API 返回格式）
+    let text = content;
+    if (Array.isArray(text)) {
+        text = text.map(p => (typeof p === 'string' ? p : (p && p.text) || '')).join('');
+    } else if (text == null || typeof text !== 'string') {
+        text = '';
+    }
+    const displayBody = text.trim() ? text.replace(/\n/g, '<br>') : '（裁判未返回内容或格式不支持）';
+
     wrapper.innerHTML = `
         <div class="judge-result-header">
             <span>${title}</span>
             <span>${timeStr}</span>
         </div>
         <div class="judge-result-body">
-            ${ (content || '').replace(/\n/g, '<br>') }
+            ${displayBody}
         </div>
     `;
 
